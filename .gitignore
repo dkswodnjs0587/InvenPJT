@@ -19,6 +19,15 @@ frontend/.vite/
 frontend/.npm-cache/
 node_modules/
 .npm-cache/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build
+/tmp
+/out-tsc
+/.pnp
+.pnp.js
 
 # Env
 .env
