@@ -1,19 +1,23 @@
-﻿import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import "./App.css";
 
 type Category = { id: number; title: string; icon: string; color: string; description: string };
 type BoardPost = { no: number; title: string; author: string; date: string; views: number; likes: number; notice?: boolean; tag?: string };
 type HomePost = { board: string; title: string; author: string; count: number; time: string };
+type HotImagePost = { tag: string; title: string; image: string };
 
 const categories: Category[] = [
-  { id: 1, title: "자유 게시판", icon: "💬", color: "#2563eb", description: "자유로운 이야기" },
-  { id: 2, title: "게임 게시판", icon: "🎮", color: "#7c3aed", description: "게임 소식과 잡담" },
-  { id: 3, title: "공략 게시판", icon: "📘", color: "#0891b2", description: "팁 · 공략 · 정보" },
-  { id: 4, title: "질문 게시판", icon: "❔", color: "#ea580c", description: "질문과 답변" },
-  { id: 5, title: "거래 게시판", icon: "🛒", color: "#16a34a", description: "아이템 · 계정 거래" },
-  { id: 6, title: "스크린샷", icon: "🖼️", color: "#dc2626", description: "인증 · 자랑 · 기록" },
+  { id: 1, title: "롤 인벤", icon: "⚔️", color: "#2563eb", description: "리그 오브 레전드" },
+  { id: 2, title: "피파 인벤", icon: "⚽", color: "#16a34a", description: "축구 게임 커뮤니티" },
+  { id: 3, title: "메이플 인벤", icon: "🍁", color: "#dc2626", description: "메이플스토리" },
+  { id: 4, title: "축구 인벤", icon: "🏟️", color: "#ea580c", description: "축구 이야기" },
+  { id: 5, title: "농구 인벤", icon: "🏀", color: "#f97316", description: "농구 이야기" },
+  { id: 6, title: "배드민턴 인벤", icon: "🏸", color: "#0891b2", description: "배드민턴 이야기" },
 ];
+
+const defaultRecentSearches = ["롤 패치노트", "메이플 이벤트", "피파 스쿼드", "농구 하이라이트"];
+const realtimeKeywords = ["롤 전적", "메이플 하이퍼버닝", "피파 신규 시즌", "축구 이적시장", "농구 플레이오프", "배드민턴 라켓", "인벤 이벤트", "게임 쿠폰", "자유 게시판", "오늘의 인기글"];
 
 const freeBoardPosts: BoardPost[] = [
   { no: 0, title: "[안내] 자유 게시판 이용 수칙", author: "운영자", date: "2026.06.23", views: 1240, likes: 16, notice: true },
@@ -38,8 +42,42 @@ const homepageRecommendedPosts: HomePost[] = [
   { board: "게임 게시판", title: "이번 시즌 주요 변경점 요약", author: "소식통", count: 12, time: "월요일" },
 ];
 
+const hotImagePosts: HotImagePost[] = [
+  { tag: "화제글", title: "롤드컵 결승전 명장면 모음", image: "https://images.unsplash.com/photo-1542751371-adc38448a05e?auto=format&fit=crop&w=520&q=80" },
+  { tag: "이벤트", title: "피파 신규 시즌 쿠폰 정리", image: "https://images.unsplash.com/photo-1574629810360-7efbbe195018?auto=format&fit=crop&w=520&q=80" },
+  { tag: "화제글", title: "메이플 여름 업데이트 미리보기", image: "https://images.unsplash.com/photo-1511512578047-dfb367046420?auto=format&fit=crop&w=520&q=80" },
+  { tag: "인기", title: "농구 플레이오프 하이라이트", image: "https://images.unsplash.com/photo-1546519638-68e109498ffc?auto=format&fit=crop&w=520&q=80" },
+];
+
 function Header({ onHome }: { onHome: () => void }) {
-  return <header className="header"><button className="logo logoButton" onClick={onHome}><span className="logoBox">I</span><span>INVEN</span><small>COMMUNITY</small></button><form className="searchBox" onSubmit={(event) => event.preventDefault()}><input type="search" aria-label="게시판 검색" placeholder="게시판, 글, 유저를 검색해보세요" /><button aria-label="검색">⌕</button></form><div className="userActions"><button className="loginBtn">로그인</button><button className="joinBtn">회원가입</button></div></header>;
+  const [keyword, setKeyword] = useState("");
+  const [recentSearches, setRecentSearches] = useState<string[]>(() => {
+    const saved = localStorage.getItem("recentSearches");
+    return saved ? JSON.parse(saved) : defaultRecentSearches;
+  });
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [showRecentSearches, setShowRecentSearches] = useState(() => localStorage.getItem("hideRecentSearches") !== "true");
+
+  useEffect(() => {
+    localStorage.setItem("recentSearches", JSON.stringify(recentSearches));
+  }, [recentSearches]);
+
+  const submitSearch = () => {
+    const nextKeyword = keyword.trim();
+    if (!nextKeyword) return;
+    setRecentSearches((current) => [nextKeyword, ...current.filter((item) => item !== nextKeyword)].slice(0, 6));
+  };
+
+  const hideRecent = () => {
+    setShowRecentSearches(false);
+    localStorage.setItem("hideRecentSearches", "true");
+  };
+
+  const removeRecent = (target: string) => {
+    setRecentSearches((current) => current.filter((item) => item !== target));
+  };
+
+  return <header className="header"><button className="logo logoButton" onClick={onHome}><span className="logoBox">I</span><span>INVEN</span><small>COMMUNITY</small></button><div className="searchArea"><form className="searchBox" onSubmit={(event) => { event.preventDefault(); submitSearch(); }}><input type="search" aria-label="게시판 검색" placeholder="게시판, 글, 유저를 검색해보세요" value={keyword} onChange={(event) => setKeyword(event.target.value)} onFocus={() => setIsSearchFocused(true)} onBlur={() => setIsSearchFocused(false)} /><button aria-label="검색">⌕</button></form>{isSearchFocused && <section className={`recentSearches ${showRecentSearches ? "" : "recentSearchesFolded"}`} onMouseDown={(event) => event.preventDefault()}>{showRecentSearches ? <><div className="recentTitle"><b>최근 검색어</b><button onClick={() => setRecentSearches([])}>전체 삭제</button></div>{recentSearches.length > 0 ? <ul>{recentSearches.map((item) => <li key={item}><button className="recentKeyword" onClick={() => setKeyword(item)}>{item}</button><button className="recentDeleteButton" aria-label={`${item} 삭제`} onClick={() => removeRecent(item)}>×</button></li>)}</ul> : <p className="recentEmpty">최근 검색어가 없습니다.</p>}<button className="recentOffButton" onClick={hideRecent}>최근 검색어 보기 끄기</button></> : <div className="recentFolded"><span>최근 검색어 보기가 꺼져 있습니다.</span><button onClick={() => { setRecentSearches([]); setShowRecentSearches(true); localStorage.removeItem("hideRecentSearches"); }}>최근 검색어 보기</button></div>}</section>}</div><div className="userActions"><button className="loginBtn">로그인</button><button className="joinBtn">회원가입</button></div></header>;
 }
 
 function FreeBoard({ onHome }: { onHome: () => void }) {
@@ -47,12 +85,19 @@ function FreeBoard({ onHome }: { onHome: () => void }) {
 }
 
 function Home({ onOpenFreeBoard }: { onOpenFreeBoard: () => void }) {
-  return <><Header onHome={() => window.scrollTo({ top: 0, behavior: "smooth" })} /><main className="main" id="home"><section className="categorySection" aria-labelledby="category-title"><div className="sectionHeading"><div><span className="eyebrow">BOARD DIRECTORY</span><h2 id="category-title">모든 게시판</h2></div><span>관심 있는 커뮤니티를 찾아보세요</span></div><div className="categoryGrid">{categories.map((category) => <button className={`categoryCard ${category.id !== 1 ? "comingSoon" : ""}`} key={category.id} style={{ "--point-color": category.color } as CSSProperties} onClick={category.id === 1 ? onOpenFreeBoard : undefined}><span className="categoryIcon">{category.icon}</span><span><b>{category.title}</b><small>{category.id === 1 ? "새 탭에서 게시판 입장" : `${category.description} · 준비 중`}</small></span><i>{category.id === 1 ? "↗" : "·"}</i></button>)}</div></section><div className="contentGrid homeBoards"><section className="boardPanel hotPanel"><div className="panelHeading"><div><span className="hotDot">●</span><h2>핫 게시판</h2><p>지금 가장 활발한 이야기</p></div><button className="textButton" onClick={onOpenFreeBoard}>더보기 →</button></div><ul className="postList">{homepageHotPosts.map((post) => <li key={post.title}><span className="boardName">{post.board}</span><button className="postLink" onClick={post.board === "자유 게시판" ? onOpenFreeBoard : undefined}>{post.title}</button><span className="postMeta">{post.author} · <b>{post.count}</b> · {post.time}</span></li>)}</ul></section><aside className="sidePanels"><section className="boardPanel"><div className="panelHeading"><div><h2>추천 게시판</h2><p>놓치기 아쉬운 글</p></div><span>더보기 →</span></div><ul className="postList">{homepageRecommendedPosts.map((post) => <li key={post.title}><span className="boardName">{post.board}</span><span className="postLink">{post.title}</span></li>)}</ul></section><section className="notice"><span>📣</span><div><b>자유 게시판 오픈</b><p>첫 번째 게시판을 둘러보고 이야기를 나눠보세요.</p></div><button onClick={onOpenFreeBoard}>입장</button></section></aside></div><section className="boardPanel latestPanel"><div className="panelHeading"><div><h2>새로운 게시글</h2><p>방금 올라온 커뮤니티 이야기</p></div><div className="tabs"><button className="selected">전체</button><button>자유</button><button>질문</button><button>정보</button></div></div><ul className="postList">{[...homepageHotPosts, ...homepageRecommendedPosts.slice(0, 2)].map((post) => <li key={`latest-${post.title}`}><span className="boardName">{post.board}</span><span className="postLink">{post.title}</span><span className="postMeta">{post.author} · <b>{post.count}</b> · {post.time}</span></li>)}</ul></section></main></>;
+  return <><Header onHome={() => window.scrollTo({ top: 0, behavior: "smooth" })} /><main className="main" id="home"><div className="directoryLayout"><section className="categorySection" aria-labelledby="category-title"><div className="sectionHeading"><div><span className="eyebrow">BOARD DIRECTORY</span><h2 id="category-title">모든 인벤</h2></div><span>관심 있는 커뮤니티를 찾아보세요</span></div><div className="categoryGrid">{categories.map((category) => <button className={`categoryCard ${category.id !== 1 ? "comingSoon" : ""}`} key={category.id} style={{ "--point-color": category.color } as CSSProperties} onClick={category.id === 1 ? onOpenFreeBoard : undefined}><span className="categoryIcon">{category.icon}</span><span><b>{category.title}</b><small>{category.id === 1 ? "새 탭에서 인벤 입장" : `${category.description} · 준비 중`}</small></span><i>{category.id === 1 ? "↗" : "·"}</i></button>)}</div></section><aside className="realtimePanel"><div className="panelHeading"><div><h2>실시간 검색어</h2><p>지금 많이 찾는 키워드</p></div></div><ol>{realtimeKeywords.map((keyword, index) => <li key={keyword}><b>{index + 1}</b><span>{keyword}</span></li>)}</ol></aside></div><div className="hotMediaLayout"><section className="boardPanel hotImagePanel"><div className="panelHeading"><div><h2>사진 인기글</h2><p>이미지가 있는 핫 게시물</p></div><button className="textButton">새로고침</button></div><div className="hotImageGrid">{hotImagePosts.map((post) => <button className="hotImageCard" key={post.title} style={{ backgroundImage: `url(${post.image})` }}><span>{post.tag}</span><b>{post.title}</b></button>)}</div></section><section className="boardPanel hotPanel"><div className="panelHeading"><div><span className="hotDot">●</span><h2>핫 게시판</h2><p>지금 가장 활발한 이야기</p></div><button className="textButton" onClick={onOpenFreeBoard}>더보기 →</button></div><ul className="postList">{homepageHotPosts.map((post) => <li key={post.title}><span className="boardName">{post.board}</span><button className="postLink" onClick={post.board === "자유 게시판" ? onOpenFreeBoard : undefined}>{post.title}</button><span className="postMeta">{post.author} · <b>{post.count}</b> · {post.time}</span></li>)}</ul></section></div><div className="lowerBoards"><section className="boardPanel latestPanel"><div className="panelHeading"><div><h2>새로운 게시글</h2><p>방금 올라온 커뮤니티 이야기</p></div><div className="tabs"><button className="selected">전체</button><button>자유</button><button>질문</button><button>정보</button></div></div><ul className="postList">{[...homepageHotPosts, ...homepageRecommendedPosts.slice(0, 2)].map((post) => <li key={`latest-${post.title}`}><span className="boardName">{post.board}</span><span className="postLink">{post.title}</span><span className="postMeta">{post.author} · <b>{post.count}</b> · {post.time}</span></li>)}</ul></section><section className="boardPanel recommendedPanel"><div className="panelHeading"><div><h2>추천 게시판</h2><p>놓치기 아쉬운 글</p></div><span>더보기 →</span></div><ul className="postList">{homepageRecommendedPosts.map((post) => <li key={post.title}><span className="boardName">{post.board}</span><span className="postLink">{post.title}</span><span className="postMeta">{post.author} · <b>{post.count}</b> · {post.time}</span></li>)}</ul></section></div></main></>;
 }
 
 function App() {
   const [activeBoard, setActiveBoard] = useState<"home" | "free">(() => new URLSearchParams(window.location.search).get("board") === "free" ? "free" : "home");
   const openFreeBoard = () => window.open(`${window.location.pathname}?board=free`, "_blank", "noopener,noreferrer");
+  useEffect(() => {
+    if ("scrollRestoration" in window.history) {
+      window.history.scrollRestoration = "manual";
+    }
+    window.scrollTo(0, 0);
+  }, []);
+
   return <div className="app">{activeBoard === "free" ? <FreeBoard onHome={() => setActiveBoard("home")} /> : <Home onOpenFreeBoard={openFreeBoard} />}<footer className="footer"><strong>INVEN COMMUNITY</strong><span>좋아하는 주제로 모이고 이야기하는 공간</span><span>© INVEN. All rights reserved.</span></footer></div>;
 }
 
