@@ -20,6 +20,17 @@ Before running the project, install these tools:
 - Node.js 20 or newer
 - MySQL 8
 
+### Run Backend and Frontend Together
+
+```bash
+npm install
+npm run dev
+```
+
+Frontend server: `http://localhost:5173`
+
+Backend server: `http://localhost:8080`
+
 ### Backend
 
 ```bash
