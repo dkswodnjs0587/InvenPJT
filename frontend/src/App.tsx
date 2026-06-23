@@ -2,9 +2,10 @@ import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import "./App.css";
 
+type Theme = "light" | "dark";
 type Category = { id: number; title: string; icon: string; color: string; description: string };
 type BoardPost = { no: number; title: string; author: string; date: string; views: number; likes: number; notice?: boolean; tag?: string };
-type HomePost = { board: string; title: string; author: string; count: number; time: string };
+type HomePost = { board: string; title: string; author: string; count: number; time: string; isHot?: boolean; isNew?: boolean };
 type HotImagePost = { tag: string; title: string; image: string };
 
 const categories: Category[] = [
@@ -31,15 +32,21 @@ const freeBoardPosts: BoardPost[] = [
 ];
 
 const homepageHotPosts: HomePost[] = [
-  { board: "자유 게시판", title: "오늘 업데이트 이후 체감 어떤가요?", author: "인벤러", count: 42, time: "12:48" },
-  { board: "게임 게시판", title: "이번 주 이벤트 보상 정리해봤습니다", author: "겜잘알", count: 31, time: "12:15" },
-  { board: "공략 게시판", title: "초보자가 먼저 챙기면 좋은 세팅 모음", author: "공략러", count: 28, time: "11:43" },
+  { board: "자유 게시판", title: "오늘 업데이트 이후 체감 어떤가요?", author: "인벤러", count: 42, time: "12:48", isHot: true, isNew: true },
+  { board: "게임 게시판", title: "이번 주 이벤트 보상 정리해봤습니다", author: "겜잘알", count: 31, time: "12:15", isHot: true, isNew: true },
+  { board: "공략 게시판", title: "초보자가 먼저 챙기면 좋은 세팅 모음", author: "공략러", count: 28, time: "11:43", isHot: true, isNew: true },
+  { board: "롤 인벤", title: "이번 패치 이후 라인전 느낌이 확 달라졌네요", author: "탑장인", count: 24, time: "11:10", isHot: true },
+  { board: "피파 인벤", title: "가성비 스쿼드 맞출 때 은근 좋은 선수들", author: "감독님", count: 21, time: "10:52", isHot: true },
+  { board: "메이플 인벤", title: "주간 보스 돌기 전에 챙기면 좋은 것들", author: "단풍러", count: 19, time: "10:28", isHot: true },
 ];
 
 const homepageRecommendedPosts: HomePost[] = [
   { board: "공략 게시판", title: "자주 묻는 질문 한 번에 보기", author: "관리자", count: 16, time: "어제" },
   { board: "거래 게시판", title: "거래 전 꼭 확인해야 할 체크리스트", author: "안전거래", count: 14, time: "어제" },
   { board: "게임 게시판", title: "이번 시즌 주요 변경점 요약", author: "소식통", count: 12, time: "월요일" },
+  { board: "축구 인벤", title: "입문자가 보기 좋은 포지션별 역할 정리", author: "축덕", count: 11, time: "월요일" },
+  { board: "농구 인벤", title: "처음 보는 사람도 이해되는 전술 용어 모음", author: "코트위", count: 9, time: "일요일" },
+  { board: "배드민턴 인벤", title: "라켓 고를 때 무게보다 먼저 봐야 할 것", author: "셔틀콕", count: 8, time: "일요일" },
 ];
 
 const hotImagePosts: HotImagePost[] = [
@@ -49,7 +56,11 @@ const hotImagePosts: HotImagePost[] = [
   { tag: "인기", title: "농구 플레이오프 하이라이트", image: "https://images.unsplash.com/photo-1546519638-68e109498ffc?auto=format&fit=crop&w=520&q=80" },
 ];
 
-function Header({ onHome, theme, onToggleTheme }: { onHome: () => void; theme: "light" | "dark"; onToggleTheme: () => void }) {
+function PostBadges({ isHot, isNew }: { isHot?: boolean; isNew?: boolean }) {
+  return <span className="badgeGroup">{isHot && <span className="hotBadge">H</span>}{isNew && <span className="newBadge">N</span>}</span>;
+}
+
+function Header({ onHome, theme, onToggleTheme }: { onHome: () => void; theme: Theme; onToggleTheme: () => void }) {
   const [keyword, setKeyword] = useState("");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>(() => {
@@ -81,22 +92,140 @@ function Header({ onHome, theme, onToggleTheme }: { onHome: () => void; theme: "
   return <header className="header"><button className="logo logoButton" onClick={onHome}><span className="logoBox">I</span><span>INVEN</span><small>COMMUNITY</small></button><div className="searchArea"><form className="searchBox" onSubmit={(event) => { event.preventDefault(); submitSearch(); }}><input type="search" aria-label="게시판 검색" placeholder="게시판, 글, 유저를 검색해보세요" value={keyword} onChange={(event) => setKeyword(event.target.value)} onFocus={() => setIsSearchFocused(true)} onBlur={() => setIsSearchFocused(false)} /><button aria-label="검색">⌕</button></form>{isSearchFocused && <section className={`recentSearches ${showRecentSearches ? "" : "recentSearchesFolded"}`} onMouseDown={(event) => event.preventDefault()}>{showRecentSearches ? <><div className="recentTitle"><b>최근 검색어</b><button onClick={() => setRecentSearches([])}>전체 삭제</button></div>{recentSearches.length > 0 ? <ul>{recentSearches.map((item) => <li key={item}><button className="recentKeyword" onClick={() => setKeyword(item)}>{item}</button><button className="recentDeleteButton" aria-label={`${item} 삭제`} onClick={() => removeRecent(item)}>×</button></li>)}</ul> : <p className="recentEmpty">최근 검색어가 없습니다.</p>}<button className="recentOffButton" onClick={hideRecent}>최근 검색어 보기 끄기</button></> : <div className="recentFolded"><span>최근 검색어 보기가 꺼져 있습니다.</span><button onClick={() => { setRecentSearches([]); setShowRecentSearches(true); localStorage.removeItem("hideRecentSearches"); }}>최근 검색어 보기</button></div>}</section>}</div><button className="menuToggle" type="button" aria-label="메뉴 열기" onClick={() => setIsMenuOpen((current) => !current)}>☰</button><div className={`userActions ${isMenuOpen ? "open" : ""}`}><button className="themeToggle" type="button" aria-label={theme === "dark" ? "라이트 모드로 변경" : "다크 모드로 변경"} onClick={onToggleTheme}>{theme === "dark" ? "☀" : "☾"}</button><button className="loginBtn">로그인</button><button className="joinBtn">회원가입</button></div></header>;
 }
 
-function FreeBoard({ onHome, theme, onToggleTheme }: { onHome: () => void; theme: "light" | "dark"; onToggleTheme: () => void }) {
+function FreeBoard({ onHome, theme, onToggleTheme }: { onHome: () => void; theme: Theme; onToggleTheme: () => void }) {
   return <><Header onHome={onHome} theme={theme} onToggleTheme={onToggleTheme} /><main className="main boardPage"><div className="breadcrumbs"><button onClick={onHome}>홈</button><span>›</span><span>자유 게시판</span></div><section className="boardHero"><div><span className="boardHeroIcon">💬</span><div><span className="eyebrow">FREE BOARD</span><h1>자유 게시판</h1><p>게임, 일상, 질문, 정보까지 자유롭게 이야기를 나누는 공간</p></div></div><button className="writeButton">✎ 글쓰기</button></section><section className="boardTabs"><button className="selected">전체</button><button>잡담</button><button>질문</button><button>정보</button><button>공략</button><button>인증</button></section><div className="boardLayout"><section className="boardTable"><div className="tableTools"><b>전체 글 <strong>3,812</strong></b><div><button className="sortSelected">최신순</button><button>추천순</button><button>조회순</button></div></div><div className="tableHead"><span>번호</span><span>제목</span><span>글쓴이</span><span>작성일</span><span>조회</span><span>추천</span></div>{freeBoardPosts.map((post) => <article className={`postRow ${post.notice ? "noticeRow" : ""}`} key={`${post.no}-${post.title}`}><span>{post.notice ? "공지" : post.no}</span><a href="#post">{post.tag && <em>{post.tag}</em>}{post.title}<small> [{post.likes}]</small></a><span>{post.author}</span><span>{post.date}</span><span>{post.views}</span><span>{post.likes}</span></article>)}<div className="pagination"><button>‹</button><button className="current">1</button><button>2</button><button>3</button><button>4</button><button>5</button><button>›</button></div></section><aside className="boardAside"><section><h2>자유 게시판 인기글</h2><ol><li>이번 시즌 주요 변경점 요약</li><li>복귀 유저를 위한 시작 가이드</li><li>오늘의 인기 스크린샷</li><li>초보자가 자주 묻는 질문</li><li>거래 전 확인할 체크리스트</li></ol></section><section className="asideNotice"><b>처음 오셨나요?</b><p>게시판 이용 수칙을 확인하고 즐겁게 참여해 주세요.</p><a href="#guide">이용 안내 보기 →</a></section></aside></div></main></>;
 }
 
-function Home({ onOpenFreeBoard, theme, onToggleTheme }: { onOpenFreeBoard: () => void; theme: "light" | "dark"; onToggleTheme: () => void }) {
-  return <><Header onHome={() => window.scrollTo({ top: 0, behavior: "smooth" })} theme={theme} onToggleTheme={onToggleTheme} /><main className="main" id="home"><div className="directoryLayout"><section className="categorySection" aria-labelledby="category-title"><div className="sectionHeading"><div><span className="eyebrow">BOARD DIRECTORY</span><h2 id="category-title">모든 인벤</h2></div><span>관심 있는 커뮤니티를 찾아보세요</span></div><div className="categoryGrid">{categories.map((category) => <button className={`categoryCard ${category.id !== 1 ? "comingSoon" : ""}`} key={category.id} style={{ "--point-color": category.color } as CSSProperties} onClick={category.id === 1 ? onOpenFreeBoard : undefined}><span className="categoryIcon">{category.icon}</span><span><b>{category.title}</b><small>{category.id === 1 ? "새 탭에서 인벤 입장" : `${category.description} · 준비 중`}</small></span><i>{category.id === 1 ? "↗" : "·"}</i></button>)}</div></section><aside className="realtimePanel"><div className="panelHeading"><div><h2>실시간 검색어</h2><p>지금 많이 찾는 키워드</p></div></div><ol>{realtimeKeywords.map((keyword, index) => <li key={keyword}><b>{index + 1}</b><span>{keyword}</span></li>)}</ol></aside></div><div className="hotMediaLayout"><section className="boardPanel hotImagePanel"><div className="panelHeading"><div><h2>사진 인기글</h2><p>이미지가 있는 핫 게시물</p></div><button className="textButton">새로고침</button></div><div className="hotImageGrid">{hotImagePosts.map((post) => <button className="hotImageCard" key={post.title} style={{ backgroundImage: `url(${post.image})` }}><span>{post.tag}</span><b>{post.title}</b></button>)}</div></section><section className="boardPanel hotPanel"><div className="panelHeading"><div><span className="hotDot">●</span><h2>핫 게시판</h2><p>지금 가장 활발한 이야기</p></div><button className="textButton" onClick={onOpenFreeBoard}>더보기 →</button></div><ul className="postList">{homepageHotPosts.map((post) => <li key={post.title}><span className="boardName">{post.board}</span><button className="postLink" onClick={post.board === "자유 게시판" ? onOpenFreeBoard : undefined}>{post.title}</button><span className="postMeta">{post.author} · <b>{post.count}</b> · {post.time}</span></li>)}</ul></section></div><div className="lowerBoards"><section className="boardPanel latestPanel"><div className="panelHeading"><div><h2 className="latestTitle"><span>새로운</span><span>게시글</span></h2><p>방금 올라온 커뮤니티 이야기</p></div><div className="tabs"><button className="selected">전체</button><button>자유</button><button>질문</button><button>정보</button></div></div><ul className="postList latestPostList">{[...homepageHotPosts, ...homepageRecommendedPosts.slice(0, 2)].map((post) => <li key={`latest-${post.title}`}><span className="boardName">{post.board}</span><span className="postLink">{post.title}</span><span className="newBadge">N</span><span className="postMeta">{post.author} · <b>{post.count}</b> · {post.time}</span></li>)}</ul></section><section className="boardPanel recommendedPanel"><div className="panelHeading"><div><h2>추천 게시판</h2><p>놓치기 아쉬운 글</p></div><span>더보기 →</span></div><ul className="postList">{homepageRecommendedPosts.map((post) => <li key={post.title}><span className="boardName">{post.board}</span><span className="postLink">{post.title}</span><span className="postMeta">{post.author} · <b>{post.count}</b> · {post.time}</span></li>)}</ul></section></div></main></>;
+function Home({ onOpenFreeBoard, theme, onToggleTheme }: { onOpenFreeBoard: () => void; theme: Theme; onToggleTheme: () => void }) {
+  const latestPosts = [...homepageHotPosts, ...homepageRecommendedPosts.slice(0, 2)].map((post) => ({ ...post, isNew: true }));
+
+  return (
+    <>
+      <Header onHome={() => window.scrollTo({ top: 0, behavior: "smooth" })} theme={theme} onToggleTheme={onToggleTheme} />
+      <main className="main" id="home">
+        <div className="directoryLayout">
+          <section className="categorySection" aria-labelledby="category-title">
+            <div className="sectionHeading">
+              <div>
+                <span className="eyebrow">BOARD DIRECTORY</span>
+                <h2 id="category-title">모든 인벤</h2>
+              </div>
+              <span>관심 있는 커뮤니티를 찾아보세요</span>
+            </div>
+            <div className="categoryGrid">
+              {categories.map((category) => (
+                <button className={`categoryCard ${category.id !== 1 ? "comingSoon" : ""}`} key={category.id} style={{ "--point-color": category.color } as CSSProperties} onClick={category.id === 1 ? onOpenFreeBoard : undefined}>
+                  <span className="categoryIcon">{category.icon}</span>
+                  <span>
+                    <b>{category.title}</b>
+                    <small>{category.id === 1 ? "새 탭에서 인벤 입장" : `${category.description} · 준비 중`}</small>
+                  </span>
+                  <i>{category.id === 1 ? "↗" : "·"}</i>
+                </button>
+              ))}
+            </div>
+          </section>
+          <aside className="realtimePanel">
+            <div className="panelHeading">
+              <div>
+                <h2>실시간 검색어</h2>
+                <p>지금 많이 찾는 키워드</p>
+              </div>
+            </div>
+            <ol>
+              {realtimeKeywords.map((keyword, index) => <li key={keyword}><b>{index + 1}</b><span>{keyword}</span></li>)}
+            </ol>
+          </aside>
+        </div>
+
+        <div className="hotMediaLayout">
+          <section className="boardPanel hotImagePanel">
+            <div className="panelHeading">
+              <div>
+                <h2>사진 인기글</h2>
+                <p>이미지가 있는 핫 게시물</p>
+              </div>
+              <button className="textButton">새로고침</button>
+            </div>
+            <div className="hotImageGrid">
+              {hotImagePosts.map((post) => (
+                <button className="hotImageCard" key={post.title} style={{ backgroundImage: `url(${post.image})` }}>
+                  <span>{post.tag}</span>
+                  <b>{post.title}</b>
+                </button>
+              ))}
+            </div>
+          </section>
+
+          <section className="boardPanel hotPanel">
+            <div className="panelHeading">
+              <div>
+                <span className="headingBadge hotBadge">H</span>
+                <h2>핫 게시판</h2>
+                <p>지금 가장 활발한 이야기</p>
+              </div>
+              <button className="textButton" onClick={onOpenFreeBoard}>더보기 →</button>
+            </div>
+            <ul className="postList hotPostList">
+              {homepageHotPosts.map((post) => (
+                <li key={post.title}>
+                  <span className="boardName">{post.board}</span>
+                  <button className="postLink" onClick={post.board === "자유 게시판" ? onOpenFreeBoard : undefined}>{post.title}</button>
+                  <span className="postMeta badgeMeta"><PostBadges isHot={post.isHot} isNew={post.isNew} />{post.author} · <b>{post.count}</b> · {post.time}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+        </div>
+
+        <div className="lowerBoards">
+          <section className="boardPanel latestPanel">
+            <div className="panelHeading">
+              <div>
+                <span className="headingBadge newBadge">N</span>
+                <h2 className="latestTitle"><span>새로운</span><span>게시글</span></h2>
+                <p>방금 올라온 커뮤니티 이야기</p>
+              </div>
+              <div className="tabs"><button className="selected">전체</button><button>자유</button><button>질문</button><button>정보</button></div>
+            </div>
+            <ul className="postList latestPostList">
+              {latestPosts.map((post) => (
+                <li key={`latest-${post.title}`}>
+                  <span className="boardName">{post.board}</span>
+                  <span className="postLink">{post.title}</span>
+                  <span className="postMeta badgeMeta"><PostBadges isHot={post.isHot} isNew={post.isNew} />{post.author} · <b>{post.count}</b> · {post.time}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="boardPanel recommendedPanel">
+            <div className="panelHeading">
+              <div>
+                <h2>추천 게시판</h2>
+                <p>놓치기 아쉬운 글</p>
+              </div>
+              <span>더보기 →</span>
+            </div>
+            <ul className="postList">
+              {homepageRecommendedPosts.map((post) => <li key={post.title}><span className="boardName">{post.board}</span><span className="postLink">{post.title}</span><span className="postMeta">{post.author} · <b>{post.count}</b> · {post.time}</span></li>)}
+            </ul>
+          </section>
+        </div>
+      </main>
+    </>
+  );
 }
 
 function App() {
   const [activeBoard, setActiveBoard] = useState<"home" | "free">(() => new URLSearchParams(window.location.search).get("board") === "free" ? "free" : "home");
-  const [theme, setTheme] = useState<"light" | "dark">(() => {
+  const [theme, setTheme] = useState<Theme>(() => {
     const savedTheme = localStorage.getItem("theme");
     if (savedTheme === "light" || savedTheme === "dark") return savedTheme;
     return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
   });
   const openFreeBoard = () => window.open(`${window.location.pathname}?board=free`, "_blank", "noopener,noreferrer");
+  const toggleTheme = () => setTheme((current) => current === "dark" ? "light" : "dark");
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -110,7 +239,7 @@ function App() {
     window.scrollTo(0, 0);
   }, []);
 
-  return <div className="app">{activeBoard === "free" ? <FreeBoard onHome={() => setActiveBoard("home")} theme={theme} onToggleTheme={() => setTheme((current) => current === "dark" ? "light" : "dark")} /> : <Home onOpenFreeBoard={openFreeBoard} theme={theme} onToggleTheme={() => setTheme((current) => current === "dark" ? "light" : "dark")} />}<footer className="footer"><strong>INVEN COMMUNITY</strong><span>좋아하는 주제로 모이고 이야기하는 공간</span><span>© INVEN. All rights reserved.</span></footer></div>;
+  return <div className="app">{activeBoard === "free" ? <FreeBoard onHome={() => setActiveBoard("home")} theme={theme} onToggleTheme={toggleTheme} /> : <Home onOpenFreeBoard={openFreeBoard} theme={theme} onToggleTheme={toggleTheme} />}<footer className="footer"><strong>INVEN COMMUNITY</strong><span>좋아하는 주제로 모이고 이야기하는 공간</span><span>© INVEN. All rights reserved.</span></footer></div>;
 }
 
 export default App;
