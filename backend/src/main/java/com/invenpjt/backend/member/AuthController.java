@@ -9,12 +9,13 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/auth")
 public class AuthController {
 
-    private static final String MEMBER_ID = "LOGIN_MEMBER_ID";
+    public static final String MEMBER_ID = "LOGIN_MEMBER_ID";
     private final MemberService memberService;
 
     public AuthController(MemberService memberService) {
@@ -37,7 +38,7 @@ public class AuthController {
     public MemberResponse me(HttpSession session) {
         Object memberId = session.getAttribute(MEMBER_ID);
         if (!(memberId instanceof Long id)) {
-            throw new org.springframework.web.server.ResponseStatusException(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다.");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다.");
         }
         return memberService.findById(id);
     }

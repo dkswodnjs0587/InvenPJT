@@ -1,11 +1,18 @@
 spring:
+  config:
+    import: optional:file:./.env[.properties]
   application:
     name: invenpjt-backend
   datasource:
-    url: jdbc:h2:mem:invenpjt;MODE=MySQL;DATABASE_TO_LOWER=TRUE
-    username: sa
-    password:
-    driver-class-name: org.h2.Driver
+    url: ${DB_URL:jdbc:mysql://localhost:3306/invenpjt?serverTimezone=Asia/Seoul&characterEncoding=UTF-8&useUnicode=true&useSSL=false&allowPublicKeyRetrieval=true}
+    username: ${DB_USERNAME:root}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    hikari:
+      pool-name: LoungeMySqlPool
+      maximum-pool-size: 10
+      minimum-idle: 2
+      connection-timeout: 10000
   jpa:
     hibernate:
       ddl-auto: update
@@ -13,10 +20,12 @@ spring:
       hibernate:
         format_sql: true
     open-in-view: false
-  h2:
-    console:
-      enabled: true
-      path: /h2-console
 
 server:
   port: 8080
+  servlet:
+    session:
+      timeout: 7d
+      cookie:
+        http-only: true
+        same-site: lax

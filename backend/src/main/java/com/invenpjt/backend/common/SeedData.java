@@ -16,13 +16,15 @@ public class SeedData implements CommandLineRunner {
 
     @Override
     public void run(String... args) {
-        if (boardRepository.count() > 0) {
-            return;
-        }
+        ensureBoard("자유 게시판", "free", "자유롭게 이야기를 나누는 공간");
+        ensureBoard("공략 게시판", "guide", "게임 공략을 정리하고 공유하는 공간");
+        ensureBoard("질문 게시판", "qna", "궁금한 점을 묻고 답하는 공간");
+    }
 
-        boardRepository.save(new Board("자유 게시판", "free", "자유롭게 이야기를 나누는 공간"));
-        boardRepository.save(new Board("공략 게시판", "guide", "팁과 공략을 정리하는 공간"));
-        boardRepository.save(new Board("질문 게시판", "qna", "궁금한 점을 묻고 답하는 공간"));
+    private void ensureBoard(String name, String slug, String description) {
+        Board board = boardRepository.findBySlug(slug)
+                .orElseGet(() -> new Board(name, slug, description));
+        board.updateDetails(name, description);
+        boardRepository.save(board);
     }
 }
-
