@@ -1,9 +1,9 @@
-﻿import { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import type { CSSProperties, FormEvent, ReactNode } from "react";
 import "./App.css";
 
 type Theme = "light" | "dark";
-type View = "home" | "free" | "login" | "signup" | "mypage";
+type View = "home" | "free" | "login" | "signup" | "mypage" | "lol";
 type Category = { id: number; title: string; icon: string; color: string; description: string };
 type BoardPost = { no: number; title: string; author: string; date: string; views: number; likes: number; notice?: boolean; tag?: string };
 type HomePost = { board: string; title: string; author: string; count: number; time: string; isHot?: boolean; isNew?: boolean };
@@ -16,7 +16,7 @@ function readView(): View {
   const params = new URLSearchParams(window.location.search);
   if (params.get("board") === "free") return "free";
   const view = params.get("view");
-  return view === "login" || view === "signup" || view === "mypage" ? view : "home";
+  return view === "login" || view === "signup" || view === "lol" ? view : "home";
 }
 
 function getCachedMember(): Member | null {
@@ -92,7 +92,7 @@ function PostBadges({ isHot, isNew }: { isHot?: boolean; isNew?: boolean }) {
   return <span className="badgeGroup">{isHot && <span className="hotBadge">H</span>}{isNew && <span className="newBadge">N</span>}</span>;
 }
 
-function Header({ onHome, theme, onToggleTheme, member, onLogin, onSignup, onLogout, onMyPage = onHome }: { onHome: () => void; theme: Theme; onToggleTheme: () => void; member: Member | null; onLogin: () => void; onSignup: () => void; onLogout: () => void; onMyPage?: () => void; isAuthReady?: boolean }) {
+function Header({ onHome, theme, onToggleTheme, member, onLogin, onSignup, onLogout, onMyPage = onHome, variant = "main", showHomeButton = false, onMainHome }: { onHome: () => void; theme: Theme; onToggleTheme: () => void; member: Member | null; onLogin: () => void; onSignup: () => void; onLogout: () => void; onMyPage?: () => void; isAuthReady?: boolean; variant?: "main" | "lol"; showHomeButton?: boolean; onMainHome?: () => void }) {
   const [keyword, setKeyword] = useState("");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>(() => {
@@ -100,6 +100,7 @@ function Header({ onHome, theme, onToggleTheme, member, onLogin, onSignup, onLog
     return saved ? JSON.parse(saved) : defaultRecentSearches;
   });
   const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [searchScope, setSearchScope] = useState("all");
   const [showRecentSearches, setShowRecentSearches] = useState(() => localStorage.getItem("hideRecentSearches") !== "true");
 
   useEffect(() => {
@@ -121,14 +122,16 @@ function Header({ onHome, theme, onToggleTheme, member, onLogin, onSignup, onLog
     setRecentSearches((current) => current.filter((item) => item !== target));
   };
 
-  return <header className="header"><button className="logo logoButton" onClick={onHome}><img className="brandLogo" src="/brand/lounge-logo.png" alt="" /><span>LOUNGE</span><small>COMMUNITY</small></button><div className="searchArea"><form className="searchBox" onSubmit={(event) => { event.preventDefault(); submitSearch(); }}><input type="search" aria-label="게시판 검색" placeholder="게시판, 글, 유저를 검색해보세요" value={keyword} onChange={(event) => setKeyword(event.target.value)} onFocus={() => setIsSearchFocused(true)} onBlur={() => setIsSearchFocused(false)} /><button aria-label="검색">⌕</button></form>{isSearchFocused && <section className={`recentSearches ${showRecentSearches ? "" : "recentSearchesFolded"}`} onMouseDown={(event) => event.preventDefault()}>{showRecentSearches ? <><div className="recentTitle"><b>최근 검색어</b><button onClick={() => setRecentSearches([])}>전체 삭제</button></div>{recentSearches.length > 0 ? <ul>{recentSearches.map((item) => <li key={item}><button className="recentKeyword" onClick={() => setKeyword(item)}>{item}</button><button className="recentDeleteButton" aria-label={`${item} 삭제`} onClick={() => removeRecent(item)}>×</button></li>)}</ul> : <p className="recentEmpty">최근 검색어가 없습니다.</p>}<button className="recentOffButton" onClick={hideRecent}>최근 검색어 보기 끄기</button></> : <div className="recentFolded"><span>최근 검색어 보기가 꺼져 있습니다.</span><button onClick={() => { setRecentSearches([]); setShowRecentSearches(true); localStorage.removeItem("hideRecentSearches"); }}>최근 검색어 보기</button></div>}</section>}</div><button className="menuToggle" type="button" aria-label="메뉴 열기" onClick={() => setIsMenuOpen((current) => !current)}>☰</button><div className={`userActions ${isMenuOpen ? "open" : ""}`}><button className="themeToggle" type="button" aria-label={theme === "dark" ? "라이트 모드로 변경" : "다크 모드로 변경"} onClick={onToggleTheme}>{theme === "dark" ? "☀" : "☾"}</button>{member ? <><span className="memberGreeting"><b>{member.nickname}</b>님</span><button className="myPageBtn" onClick={onMyPage}>마이페이지</button><button className="loginBtn" onClick={onLogout}>로그아웃</button></> : <><button className="loginBtn" onClick={onLogin}>로그인</button><button className="joinBtn" onClick={onSignup}>회원가입</button></>}</div></header>;
+  const isLolHeader = variant === "lol";
+
+  return <header className={`header ${isLolHeader ? "lolHeader" : ""}`}><button className="logo logoButton" onClick={onHome}>{isLolHeader ? <><span className="brandLogo logoBox lolLogoMark">L</span><span className="logoText"><span>LOL LOUNGE</span><small>LEAGUE OF LEGENDS</small></span></> : <><img className="brandLogo" src="/brand/lounge-logo.png" alt="" /><span>LOUNGE</span><small>COMMUNITY</small></>}</button><div className="searchArea"><form className={`searchBox ${isSearchFocused ? "searchBoxFocused" : ""}`} onFocus={() => setIsSearchFocused(true)} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsSearchFocused(false); }} onSubmit={(event) => { event.preventDefault(); submitSearch(); }}>{isSearchFocused && <select className="searchScopeSelect" aria-label="검색 범위" value={searchScope} onChange={(event) => setSearchScope(event.target.value)}><option value="all">전체</option><option value="content">글 내용</option><option value="author">글쓴이</option></select>}<input type="search" aria-label="게시판 검색" placeholder={isSearchFocused ? "" : "게시판, 글, 유저를 검색해보세요"} value={keyword} onChange={(event) => setKeyword(event.target.value)} /><button aria-label="검색">⌕</button></form>{isSearchFocused && <section className={`recentSearches ${showRecentSearches ? "" : "recentSearchesFolded"}`} onMouseDown={(event) => event.preventDefault()}>{showRecentSearches ? <><div className="recentTitle"><b>최근 검색어</b><button onClick={() => setRecentSearches([])}>전체 삭제</button></div>{recentSearches.length > 0 ? <ul>{recentSearches.map((item) => <li key={item}><button className="recentKeyword" onClick={() => setKeyword(item)}>{item}</button><button className="recentDeleteButton" aria-label={`${item} 삭제`} onClick={() => removeRecent(item)}>×</button></li>)}</ul> : <p className="recentEmpty">최근 검색어가 없습니다.</p>}<button className="recentOffButton" onClick={hideRecent}>최근 검색어 보기 끄기</button></> : <div className="recentFolded"><span>최근 검색어 보기가 꺼져 있습니다.</span><button onClick={() => { setRecentSearches([]); setShowRecentSearches(true); localStorage.removeItem("hideRecentSearches"); }}>최근 검색어 보기</button></div>}</section>}</div><button className="menuToggle" type="button" aria-label="메뉴 열기" onClick={() => setIsMenuOpen((current) => !current)}>☰</button><div className={`userActions ${isMenuOpen ? "open" : ""}`}>{showHomeButton && <button className="homeIconBtn" type="button" aria-label="메인 라운지로 돌아가기" onClick={onMainHome ?? onHome}>⌂</button>}<button className="themeToggle" type="button" aria-label={theme === "dark" ? "라이트 모드로 변경" : "다크 모드로 변경"} onClick={onToggleTheme}>{theme === "dark" ? "☀" : "☾"}</button>{member ? <><span className="memberGreeting"><b>{member.nickname}</b>님</span><button className="myPageBtn" onClick={onMyPage}>마이페이지</button><button className="loginBtn" onClick={onLogout}>로그아웃</button></> : <><button className="loginBtn" onClick={onLogin}>로그인</button><button className="joinBtn" onClick={onSignup}>회원가입</button></>}</div></header>;
 }
 
 function FreeBoard({ onHome, theme, onToggleTheme, member, onLogin, onSignup, onLogout, onMyPage = onHome }: { onHome: () => void; theme: Theme; onToggleTheme: () => void; member: Member | null; onLogin: () => void; onSignup: () => void; onLogout: () => void; onMyPage?: () => void }) {
   return <><Header onHome={onHome} theme={theme} onToggleTheme={onToggleTheme} member={member} onLogin={onLogin} onSignup={onSignup} onLogout={onLogout} onMyPage={onMyPage} /><main className="main boardPage"><div className="breadcrumbs"><button onClick={onHome}>홈</button><span>›</span><span>자유 게시판</span></div><section className="boardHero"><div><span className="boardHeroIcon">💬</span><div><span className="eyebrow">FREE BOARD</span><h1>자유 게시판</h1><p>게임, 일상, 질문, 정보까지 자유롭게 이야기를 나누는 공간</p></div></div><button className="writeButton">✎ 글쓰기</button></section><section className="boardTabs"><button className="selected">전체</button><button>잡담</button><button>질문</button><button>정보</button><button>공략</button><button>인증</button></section><div className="boardLayout"><section className="boardTable"><div className="tableTools"><b>전체 글 <strong>3,812</strong></b><div><button className="sortSelected">최신순</button><button>추천순</button><button>조회순</button></div></div><div className="tableHead"><span>번호</span><span>제목</span><span>글쓴이</span><span>작성일</span><span>조회</span><span>추천</span></div>{freeBoardPosts.map((post) => <article className={`postRow ${post.notice ? "noticeRow" : ""}`} key={`${post.no}-${post.title}`}><span>{post.notice ? "공지" : post.no}</span><a href="#post">{post.tag && <em>{post.tag}</em>}{post.title}<small> [{post.likes}]</small></a><span>{post.author}</span><span>{post.date}</span><span>{post.views}</span><span>{post.likes}</span></article>)}<div className="pagination"><button>‹</button><button className="current">1</button><button>2</button><button>3</button><button>4</button><button>5</button><button>›</button></div></section><aside className="boardAside"><section><h2>자유 게시판 인기글</h2><ol><li>이번 시즌 주요 변경점 요약</li><li>복귀 유저를 위한 시작 가이드</li><li>오늘의 인기 스크린샷</li><li>초보자가 자주 묻는 질문</li><li>거래 전 확인할 체크리스트</li></ol></section><section className="asideNotice"><b>처음 오셨나요?</b><p>게시판 이용 수칙을 확인하고 즐겁게 참여해 주세요.</p><a href="#guide">이용 안내 보기 →</a></section></aside></div></main></>;
 }
 
-function Home({ onOpenFreeBoard, theme, onToggleTheme, member, onLogin, onSignup, onLogout, onMyPage = onLogin }: { onOpenFreeBoard: () => void; theme: Theme; onToggleTheme: () => void; member: Member | null; onLogin: () => void; onSignup: () => void; onLogout: () => void; onMyPage?: () => void }) {
+function Home({ onOpenFreeBoard, onOpenLounge, theme, onToggleTheme, member, onLogin, onSignup, onLogout, onMyPage = onLogin }: { onOpenFreeBoard: () => void; onOpenLounge: (category: Category) => void; theme: Theme; onToggleTheme: () => void; member: Member | null; onLogin: () => void; onSignup: () => void; onLogout: () => void; onMyPage?: () => void }) {
   const latestPosts = [...homepageHotPosts, ...homepageRecommendedPosts.slice(0, 2)].map((post) => ({ ...post, isNew: true }));
 
   return (
@@ -146,11 +149,11 @@ function Home({ onOpenFreeBoard, theme, onToggleTheme, member, onLogin, onSignup
             </div>
             <div className="categoryGrid">
               {categories.map((category) => (
-                <button className={`categoryCard ${category.id !== 1 ? "comingSoon" : ""}`} key={category.id} style={{ "--point-color": category.color } as CSSProperties} onClick={category.id === 1 ? onOpenFreeBoard : undefined}>
+                <button className="categoryCard" key={category.id} style={{ "--point-color": category.color } as CSSProperties} onClick={() => onOpenLounge(category)}>
                   <span className="categoryIcon">{category.icon}</span>
                   <span>
                     <b>{category.title}</b>
-                    <small>{category.id === 1 ? "새 탭에서 라운지 입장" : `${category.description} · 준비 중`}</small>
+                    <small>{category.id === 1 ? "새 창에서 라운지 입장" : `${category.description} · 준비 중`}</small>
                   </span>
                   <i>{category.id === 1 ? "↗" : "·"}</i>
                 </button>
@@ -383,10 +386,14 @@ function EnhancedAuthPage({ mode, theme, onToggleTheme, onHome, onModeChange, on
   return <><Header onHome={onHome} theme={theme} onToggleTheme={onToggleTheme} member={null} onLogin={() => onModeChange("login")} onSignup={() => onModeChange("signup")} onLogout={() => undefined} /><main className="authMain"><section className="authCard"><img className="authLogo" src="/brand/lounge-logo.png" alt="LOUNGE" /><span className="eyebrow">{isSignup ? "CREATE ACCOUNT" : "WELCOME BACK"}</span><h1>{isSignup ? "회원가입" : "로그인"}</h1><p>{isSignup ? "라운지 커뮤니티에서 사용할 계정을 만들어보세요." : "계정으로 로그인하고 커뮤니티를 이어가세요."}</p><form className="authForm" onSubmit={submitAuth}>{isSignup && <><label>닉네임<input value={nickname} onChange={(event) => setNickname(event.target.value)} placeholder="커뮤니티 닉네임" autoComplete="nickname" required minLength={2} maxLength={30} /></label><label>이메일<input type="email" value={email} onChange={(event) => { setEmail(event.target.value); if (emailError) validateEmail(event.target.value); }} onBlur={(event) => validateEmail(event.target.value)} onInvalid={(event) => event.currentTarget.setCustomValidity("정확한 형식으로 이메일을 입력하세요.")} onInput={(event) => event.currentTarget.setCustomValidity("")} placeholder="email@example.com" autoComplete="email" required maxLength={254} />{emailError && <span className="fieldError">{emailError}</span>}</label></>}<label>아이디<input value={username} onChange={(event) => setUsername(event.target.value)} placeholder="영문, 숫자 7자 이상" autoComplete="username" required minLength={7} maxLength={30} pattern="[A-Za-z0-9]{7,30}" title="아이디는 영문과 숫자 7~30자로 입력해 주세요." /><small>영문과 숫자만 사용해 7~30자로 입력해 주세요.</small></label><label>비밀번호{isSignup ? <input type="password" value={password} onChange={(event) => setPassword(event.target.value)} placeholder="8자 이상 입력하세요" autoComplete="new-password" required minLength={8} maxLength={72} /> : <span className="passwordInput"><input type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="8자 이상 입력하세요" autoComplete="current-password" required minLength={8} maxLength={72} /><button type="button" className="passwordToggle" onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? "비밀번호 숨기기" : "비밀번호 보기"}>{showPassword ? "◉" : "◉"}</button></span>}<small>8~72자로 입력해 주세요.</small></label>{isSignup && <label>비밀번호 확인<input type="password" value={passwordConfirm} onChange={(event) => setPasswordConfirm(event.target.value)} placeholder="비밀번호를 한 번 더 입력하세요" autoComplete="new-password" required /></label>}{error && <p className="authError">{error}</p>}{isSignup ? <div className="authActions"><button type="button" className="authCancel" onClick={onHome}>취소</button><button className="authSubmit" disabled={isSubmitting}>{isSubmitting ? "처리 중..." : "가입하기"}</button></div> : <button className="authSubmit" disabled={isSubmitting}>{isSubmitting ? "처리 중..." : "로그인"}</button>}</form><p className="authSwitch">{isSignup ? "이미 계정이 있나요?" : "아직 계정이 없나요?"} <button onClick={() => onModeChange(isSignup ? "login" : "signup")}>{isSignup ? "로그인" : "회원가입"}</button></p><p className="authSecurity">비밀번호는 BCrypt 단방향 해시로 안전하게 저장됩니다.</p></section></main></>;
 }
 
-function MyPage({ member, header }: { member: Member; header: ReactNode }) {
+
+function LolLounge({ header }: { header: ReactNode }) {
+  return <>{header}<main className="main lolLounge"><section className="lolHero"><div><span className="eyebrow">LOL LOUNGE</span><h1>롤 라운지</h1><p>리그 오브 레전드 이야기를 위한 별도 라운지입니다.</p></div></section><section className="lolQuickGrid"><article><b>로그인</b><span>상단 버튼으로 계정에 로그인할 수 있습니다.</span></article><article><b>회원가입</b><span>처음 방문했다면 계정을 만들고 참여하세요.</span></article><article><b>마이페이지</b><span>로그인 후 내 정보와 설정을 확인할 수 있습니다.</span></article><article><b>다크모드</b><span>헤더의 테마 버튼으로 화면 분위기를 바꿀 수 있습니다.</span></article></section></main></>;
+}
+function MyPageModal({ member, onClose }: { member: Member; onClose: () => void }) {
   const [saved, setSaved] = useState(false);
 
-  return <>{header}<main className="main myPage"><div className="breadcrumbs"><span>홈</span><span>›</span><span>마이페이지</span></div><section className="myPageGrid"><section className="myProfileCard"><div className="profileBadge">{member.nickname.slice(0, 1)}</div><div><span className="eyebrow">MY LOUNGE</span><h1>{member.nickname}님의 라운지</h1><p>{member.username} · {member.email || "이메일 미등록"}</p></div></section><section className="mySettingsCard"><div className="panelHeading"><div><h2>커뮤니티 설정</h2><p>나에게 맞는 라운지를 설정하세요</p></div></div><form onSubmit={(event) => { event.preventDefault(); setSaved(true); }}><label>관심 게시판<select defaultValue="자유 게시판"><option>자유 게시판</option><option>게임 게시판</option><option>공략 게시판</option></select></label><label className="checkLabel"><input type="checkbox" defaultChecked /> 인기글 알림 받기</label><label className="checkLabel"><input type="checkbox" defaultChecked /> 내 글의 댓글 알림 받기</label><button className="authSubmit">설정 저장</button>{saved && <p className="settingsSaved">설정이 저장되었습니다.</p>}</form></section></section><section className="myActivity"><h2>나의 활동</h2><div><strong>0</strong><span>작성한 글</span></div><div><strong>0</strong><span>받은 댓글</span></div><div><strong>0</strong><span>북마크</span></div></section></main></>;
+  return <div className="modalOverlay" role="presentation" onMouseDown={onClose}><section className="myPageModal" role="dialog" aria-modal="true" aria-labelledby="my-page-title" onMouseDown={(event) => event.stopPropagation()}><div className="modalHeader"><div><span className="eyebrow">MY LOUNGE</span><h1 id="my-page-title">마이페이지</h1></div><button className="modalClose" type="button" aria-label="마이페이지 닫기" onClick={onClose}>×</button></div><section className="myPageGrid"><section className="myProfileCard"><div className="profileBadge">{member.nickname.slice(0, 1)}</div><div><span className="eyebrow">MY LOUNGE</span><h1>{member.nickname}님의 라운지</h1><p>{member.username} · {member.email || "이메일 미등록"}</p></div></section><section className="mySettingsCard"><div className="panelHeading"><div><h2>커뮤니티 설정</h2><p>나에게 맞는 라운지를 설정하세요</p></div></div><form onSubmit={(event) => { event.preventDefault(); setSaved(true); }}><label>관심 게시판<select defaultValue="자유 게시판"><option>자유 게시판</option><option>게임 게시판</option><option>공략 게시판</option></select></label><label className="checkLabel"><input type="checkbox" defaultChecked /> 인기글 알림 받기</label><label className="checkLabel"><input type="checkbox" defaultChecked /> 내 글의 댓글 알림 받기</label><button className="authSubmit">설정 저장</button>{saved && <p className="settingsSaved">설정이 저장되었습니다.</p>}</form></section></section><section className="myActivity"><h2>나의 활동</h2><div><strong>0</strong><span>작성한 글</span></div><div><strong>0</strong><span>받은 댓글</span></div><div><strong>0</strong><span>북마크</span></div></section></section></div>;
 }
 
 
@@ -395,76 +402,12 @@ function LegacyMyPage({ member, theme, onToggleTheme, onHome, onLogin, onSignup,
 
   return <><Header onHome={onHome} theme={theme} onToggleTheme={onToggleTheme} member={member} isAuthReady={true} onLogin={onLogin} onSignup={onSignup} onMyPage={onMyPage} onLogout={onLogout} /><main className="main myPage"><div className="breadcrumbs"><button onClick={onHome}>홈</button><span>›</span><span>마이페이지</span></div><section className="myPageGrid"><section className="myProfileCard"><div className="profileBadge">{member.nickname.slice(0, 1)}</div><div><span className="eyebrow">MY COMMUNITY</span><h1>{member.nickname}님의 마이페이지</h1><p>{member.username} · {member.email}</p></div></section><section className="mySettingsCard"><div className="panelHeading"><div><h2>커뮤니티 설정</h2><p>자주 보는 게시판과 알림을 설정하세요</p></div></div><form onSubmit={(event) => { event.preventDefault(); setSaved(true); }}><label>관심 게시판<select defaultValue="자유 게시판"><option>자유 게시판</option><option>게임 게시판</option><option>공략 게시판</option><option>질문 게시판</option></select></label><label className="checkLabel"><input type="checkbox" defaultChecked /> 인기글 알림 받기</label><label className="checkLabel"><input type="checkbox" defaultChecked /> 내 글의 댓글 알림 받기</label><button className="authSubmit">설정 저장</button>{saved && <p className="settingsSaved">설정이 저장되었습니다.</p>}</form></section></section><section className="myActivity"><h2>나의 활동</h2><div><strong>0</strong><span>작성한 글</span></div><div><strong>0</strong><span>받은 댓글</span></div><div><strong>0</strong><span>북마크</span></div></section></main></>;
 }
-function App() {
-  const [activeView, setActiveViewState] = useState<View>(() => {
-    const params = new URLSearchParams(window.location.search);
-    const view = params.get("view");
-    if (view === "login" || view === "signup" || view === "mypage") return view;
-    return params.get("board") === "free" ? "free" : "home";
-  });
-  const [member, setMember] = useState<Member | null>(null);
-  const [isAuthReady, setIsAuthReady] = useState(false);
-  const [theme, setTheme] = useState<Theme>(() => {
-    const savedTheme = localStorage.getItem("theme");
-    if (savedTheme === "light" || savedTheme === "dark") return savedTheme;
-    return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
-  });
-  const openFreeBoard = () => window.open(`${window.location.pathname}?board=free`, "_blank", "noopener,noreferrer");
-  const toggleTheme = () => setTheme((current) => current === "dark" ? "light" : "dark");
-  const setActiveView = (nextView: View) => {
-    setActiveViewState(nextView);
-    const query = nextView === "home" ? "" : nextView === "free" ? "?board=free" : `?view=${nextView}`;
-    window.history.replaceState(null, "", `${window.location.pathname}${query}`);
-  };
-  const goHome = () => setActiveView("home");
-  const goMyPage = () => member ? setActiveView("mypage") : setActiveView("login");
-  const logout = async () => {
-    await fetch("/api/auth/logout", { method: "POST", credentials: "include" }).catch(() => undefined);
-    setMember(null);
-    setActiveView("home");
-  };
-
-  useEffect(() => {
-    let isActive = true;
-
-    fetch("/api/auth/me", { credentials: "include" })
-      .then((response) => response.ok ? response.json() : null)
-      .then((currentMember: Member | null) => {
-        if (isActive && currentMember) {
-          setMember(currentMember);
-        }
-      })
-      .catch(() => undefined)
-      .then(() => {
-        if (isActive) {
-          setIsAuthReady(true);
-        }
-      });
-
-    return () => {
-      isActive = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    localStorage.setItem("theme", theme);
-  }, [theme]);
-
-  useEffect(() => {
-    if ("scrollRestoration" in window.history) {
-      window.history.scrollRestoration = "manual";
-    }
-    window.scrollTo(0, 0);
-  }, []);
-
-  return <div className="app">{activeView === "free" && <FreeBoard onHome={goHome} theme={theme} onToggleTheme={toggleTheme} member={member} onLogin={() => setActiveView("login")} onSignup={() => setActiveView("signup")} onLogout={logout} />}{activeView === "home" && <Home onOpenFreeBoard={openFreeBoard} theme={theme} onToggleTheme={toggleTheme} member={member} onLogin={() => setActiveView("login")} onSignup={() => setActiveView("signup")} onLogout={logout} />}{(activeView === "login" || activeView === "signup") && <AuthPage mode={activeView} theme={theme} onToggleTheme={toggleTheme} onHome={goHome} onModeChange={setActiveView} onSuccess={(nextMember) => { setMember(nextMember); setActiveView("home"); }} />}<footer className="footer"><strong>LOUNGE COMMUNITY</strong><span>좋아하는 주제로 모이고 이야기하는 공간</span><span>© LOUNGE. All rights reserved.</span></footer></div>;
-}
-
 function EnhancedApp() {
   const [activeView, setActiveView] = useState<View>(readView);
   const [member, setMember] = useState<Member | null>(getCachedMember);
   const [sessionChecked, setSessionChecked] = useState(false);
+  const [authReturnView, setAuthReturnView] = useState<View>("home");
+  const [isMyPageOpen, setIsMyPageOpen] = useState(false);
   const [theme, setTheme] = useState<Theme>(() => {
     const savedTheme = localStorage.getItem("theme");
     if (savedTheme === "light" || savedTheme === "dark") return savedTheme;
@@ -481,19 +424,49 @@ function EnhancedApp() {
     const url = new URL(window.location.href);
     url.search = "";
     if (nextView === "free") url.searchParams.set("board", "free");
-    if (nextView === "login" || nextView === "signup" || nextView === "mypage") url.searchParams.set("view", nextView);
+    if (nextView === "login" || nextView === "signup" || nextView === "lol") url.searchParams.set("view", nextView);
     window.history[replace ? "replaceState" : "pushState"]({ view: nextView }, "", url);
     setActiveView(nextView);
     window.scrollTo(0, 0);
   };
 
   const toggleTheme = () => setTheme((current) => current === "dark" ? "light" : "dark");
-  const openFreeBoard = () => window.open(`${window.location.pathname}?board=free`, "_blank", "noopener,noreferrer");
+  const openFreeBoard = () => navigate("free");
+  const openLounge = (category: Category) => {
+    if (category.id === 1) {
+      window.open(`${window.location.pathname}?view=lol`, "_blank", "noopener,noreferrer");
+    }
+  };
+  const goLogin = () => {
+    setAuthReturnView(activeView === "lol" ? "lol" : "home");
+    navigate("login");
+  };
+
+  const goSignup = () => {
+    setAuthReturnView(activeView === "lol" ? "lol" : "home");
+    navigate("signup");
+  };
+
+
+  const openMyPage = () => {
+    if (!member) {
+      goLogin();
+      return;
+    }
+    setIsMyPageOpen(true);
+  };
   const logout = async () => {
+    const nextView = activeView === "lol" ? "lol" : "home";
     await fetch("/api/auth/logout", { method: "POST", credentials: "include" }).catch(() => undefined);
     updateMember(null);
-    navigate("home", true);
+    setIsMyPageOpen(false);
+    navigate(nextView, true);
   };
+
+  useEffect(() => {
+    const pageTitle = activeView === "lol" ? "LOL LOUNGE" : activeView === "login" ? "로그인" : activeView === "signup" ? "회원가입" : "LOUNGE";
+    document.title = pageTitle;
+  }, [activeView]);
 
   useEffect(() => {
     document.documentElement.dataset.theme = theme;
@@ -527,9 +500,14 @@ function EnhancedApp() {
     if (sessionChecked && activeView === "mypage" && !member) navigate("login", true);
   }, [activeView, member, sessionChecked]);
 
-  const header = <Header onHome={() => navigate("home")} theme={theme} onToggleTheme={toggleTheme} member={member} onLogin={() => navigate("login")} onSignup={() => navigate("signup")} onLogout={logout} onMyPage={() => navigate("mypage")} />;
+  const isLolView = activeView === "lol";
+  const header = <Header onHome={() => navigate(isLolView ? "lol" : "home")} theme={theme} onToggleTheme={toggleTheme} member={member} onLogin={goLogin} onSignup={goSignup} onLogout={logout} onMyPage={openMyPage} onMainHome={() => navigate("home")} variant={isLolView ? "lol" : "main"} showHomeButton={isLolView} />;
 
-  return <div className="app">{activeView === "free" && <FreeBoard onHome={() => navigate("home")} theme={theme} onToggleTheme={toggleTheme} member={member} onLogin={() => navigate("login")} onSignup={() => navigate("signup")} onLogout={logout} onMyPage={() => navigate("mypage")} />}{activeView === "home" && <Home onOpenFreeBoard={openFreeBoard} theme={theme} onToggleTheme={toggleTheme} member={member} onLogin={() => navigate("login")} onSignup={() => navigate("signup")} onLogout={logout} onMyPage={() => navigate("mypage")} />}{(activeView === "login" || activeView === "signup") && <EnhancedAuthPage mode={activeView} theme={theme} onToggleTheme={toggleTheme} onHome={() => navigate("home")} onModeChange={(nextView) => navigate(nextView)} onSuccess={(loggedIn) => { updateMember(loggedIn); navigate("home", true); }} />}{activeView === "mypage" && member && <MyPage member={member} header={header} />}<footer className="footer"><strong>LOUNGE COMMUNITY</strong><span>좋아하는 주제로 모이고 이야기하는 공간</span><span>© LOUNGE. All rights reserved.</span></footer></div>;
+  return <div className="app">{activeView === "lol" && <LolLounge header={header} />}{activeView === "free" && <FreeBoard onHome={() => navigate("home")} theme={theme} onToggleTheme={toggleTheme} member={member} onLogin={goLogin} onSignup={goSignup} onLogout={logout} onMyPage={openMyPage} />}{activeView === "home" && <Home onOpenFreeBoard={openFreeBoard} onOpenLounge={openLounge} theme={theme} onToggleTheme={toggleTheme} member={member} onLogin={goLogin} onSignup={goSignup} onLogout={logout} onMyPage={openMyPage} />}{(activeView === "login" || activeView === "signup") && <EnhancedAuthPage mode={activeView} theme={theme} onToggleTheme={toggleTheme} onHome={() => navigate("home")} onModeChange={(nextView) => navigate(nextView)} onSuccess={(loggedIn) => { updateMember(loggedIn); navigate(authReturnView, true); }} />}{member && isMyPageOpen && <MyPageModal member={member} onClose={() => setIsMyPageOpen(false)} />}<footer className="footer"><strong>LOUNGE COMMUNITY</strong><span>좋아하는 주제로 모이고 이야기하는 공간</span><span>© LOUNGE. All rights reserved.</span></footer></div>;
 }
 
 export default EnhancedApp;
+
+
+
+

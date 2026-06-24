@@ -280,3 +280,236 @@ html[data-theme="dark"] .realtimePanel li b {
 .myActivity span { color: var(--muted); font-size: 12px; }
 @media (max-width: 820px) { .myPageGrid { grid-template-columns: 1fr; }.myActivity { gap: 22px; }.myActivity h2 { display: none; } }
 @media (max-width: 600px) { .userActions .myPageBtn { width: 100%; }.myProfileCard { min-height: 150px; padding: 22px; }.myActivity { justify-content: space-between; padding: 20px; }.myActivity strong { font-size: 19px; } }
+
+.lolLounge {
+  padding-top: 36px;
+}
+
+.lolHero {
+  min-height: 260px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 42px;
+  border: 1px solid rgba(201, 162, 74, .45);
+  border-radius: 20px;
+  background:
+    radial-gradient(circle at 82% 22%, rgba(255, 214, 102, .28), transparent 27%),
+    linear-gradient(125deg, #07111f, #0b2f45 56%, #6f5215);
+  color: white;
+  box-shadow: 0 20px 46px rgba(7, 17, 31, .24);
+}
+
+.lolHero .eyebrow {
+  color: #f8d36f;
+}
+
+.lolHero h1 {
+  margin: 0;
+  font-size: 42px;
+  letter-spacing: -1px;
+}
+
+.lolHero p {
+  margin: 12px 0 0;
+  color: #d8e7f6;
+  font-size: 15px;
+}
+
+.lolHero button {
+  min-height: 44px;
+  padding: 0 18px;
+  border: 1px solid rgba(255,255,255,.28);
+  border-radius: 9px;
+  background: #d4a83f;
+  color: #07111f;
+  cursor: pointer;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.lolQuickGrid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 20px;
+}
+
+.lolQuickGrid article {
+  min-height: 130px;
+  padding: 20px;
+  border: 1px solid rgba(201, 162, 74, .34);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 88%, #f6d477);
+  box-shadow: 0 12px 28px rgba(7,17,31,.08);
+}
+
+.lolQuickGrid b,
+.lolQuickGrid span {
+  display: block;
+}
+
+.lolQuickGrid b {
+  color: var(--text);
+  font-size: 17px;
+}
+
+.lolQuickGrid span {
+  margin-top: 8px;
+  color: var(--muted);
+  font-size: 13px;
+  line-height: 1.55;
+}
+
+html[data-theme="dark"] .lolQuickGrid article {
+  background: linear-gradient(145deg, #13233a, #1e293b);
+  border-color: rgba(248, 211, 111, .35);
+}
+
+@media (max-width: 920px) {
+  .lolHero {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 32px;
+  }
+
+  .lolQuickGrid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 600px) {
+  .lolHero {
+    padding: 26px 20px;
+  }
+
+  .lolHero h1 {
+    font-size: 32px;
+  }
+
+  .lolQuickGrid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.lolHeader {
+  background: linear-gradient(90deg, #07111f, #0b2f45 58%, #4c3910);
+  box-shadow: 0 12px 32px rgba(7, 17, 31, .26);
+}
+
+.lolHeader .logo {
+  letter-spacing: 0;
+}
+
+.lolHeader .logoBox {
+  background: linear-gradient(135deg, #d4a83f, #f8d36f);
+  color: #07111f;
+}
+
+.lolHeader .logo small {
+  color: #f8d36f;
+}
+
+.lolHeader .searchBox {
+  border-color: rgba(248, 211, 111, .42);
+  background: rgba(255,255,255,.10);
+}
+
+.lolHeader .searchBox:focus-within {
+  border-color: #f8d36f;
+}
+
+.lolHeader .joinBtn {
+  background: #d4a83f;
+  color: #07111f;
+}
+
+.lolHeader .loginBtn,
+.lolHeader .myPageBtn,
+.lolHeader .themeToggle,
+.lolHeader .homeIconBtn {
+  border-color: rgba(248, 211, 111, .46);
+}
+
+.homeIconBtn {
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  border: 1px solid #536077;
+  border-radius: 8px;
+  background: transparent;
+  color: white;
+  cursor: pointer;
+  font-size: 20px;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.homeIconBtn:hover {
+  background: rgba(255,255,255,.14);
+}
+
+@media (max-width: 600px) {
+  .userActions .homeIconBtn {
+    width: 100%;
+  }
+}
+
+.logoText {
+  display: grid;
+  gap: 1px;
+  line-height: 1;
+}
+
+.logoText > span {
+  white-space: nowrap;
+}
+
+.logo .logoText small {
+  align-self: auto;
+  margin-bottom: 0;
+}
+
+.lolLogoMark {
+  flex: 0 0 auto;
+  width: 42px;
+  height: 42px;
+  border-radius: 12px;
+  font-size: 24px;
+}
+
+.lolHeader .logo {
+  align-items: center;
+  gap: 12px;
+  font-size: 22px;
+}
+
+.lolHeader .logoText {
+  gap: 4px;
+}
+
+.lolHeader .logoText small {
+  font-size: 10px;
+  letter-spacing: 1.4px;
+}
+.modalOverlay { position: fixed; inset: 0; z-index: 1000; display: grid; place-items: center; padding: 24px; background: rgba(8, 13, 24, .62); backdrop-filter: blur(6px); }
+.myPageModal { width: min(960px, 100%); max-height: min(86vh, 780px); overflow: auto; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); box-shadow: 0 28px 70px rgba(0,0,0,.32); padding: 24px; }
+.modalHeader { display: flex; align-items: flex-start; justify-content: space-between; gap: 18px; padding-bottom: 14px; border-bottom: 1px solid var(--border); }
+.modalHeader h1 { margin: 4px 0 0; color: var(--text); font-size: 24px; }
+.modalClose { width: 38px; height: 38px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface-soft); color: var(--text); cursor: pointer; font-size: 24px; line-height: 1; }
+.modalClose:hover { border-color: #7ca5ff; color: #2563eb; }
+.myPageModal .myPageGrid { margin-top: 20px; }
+.myPageModal .myActivity { margin-bottom: 2px; }
+@media (max-width: 600px) { .modalOverlay { padding: 12px; align-items: start; } .myPageModal { max-height: calc(100vh - 24px); padding: 18px; border-radius: 12px; } .modalHeader h1 { font-size: 21px; } }
+.searchBox { align-items: center; gap: 8px; padding: 0 6px 0 14px; }
+.searchBoxFocused { padding-left: 8px; }
+.searchScopeSelect { height: 34px; flex: 0 0 auto; border: 1px solid rgba(165,177,196,.55); border-radius: 8px; background: rgba(255,255,255,.08); color: white; padding: 0 28px 0 10px; font-size: 13px; font-weight: 800; outline: 0; cursor: pointer; }
+.searchScopeSelect option { color: #253248; background: white; }
+.searchBox input { height: 100%; }
+.searchBox button { height: 38px; width: 42px; display: grid; place-items: center; border-radius: 9px; line-height: 1; font-size: 24px; }
+.searchBox button:hover { background: rgba(255,255,255,.10); }
+html[data-theme="dark"] .searchScopeSelect option { color: #e5ecf7; background: #151b26; }
+@media (max-width: 600px) { .searchScopeSelect { max-width: 92px; font-size: 12px; padding-left: 8px; } .searchBox { gap: 6px; } }
+.searchBox button { padding-bottom: 2px; transform: translateY(-2px); }
+
