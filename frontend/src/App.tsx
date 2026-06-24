@@ -92,7 +92,7 @@ function PostBadges({ isHot, isNew }: { isHot?: boolean; isNew?: boolean }) {
   return <span className="badgeGroup">{isHot && <span className="hotBadge">H</span>}{isNew && <span className="newBadge">N</span>}</span>;
 }
 
-function Header({ onHome, theme, onToggleTheme, member, onLogin, onSignup, onLogout, onMyPage = onHome }: { onHome: () => void; theme: Theme; onToggleTheme: () => void; member: Member | null; onLogin: () => void; onSignup: () => void; onLogout: () => void; onMyPage?: () => void }) {
+function Header({ onHome, theme, onToggleTheme, member, onLogin, onSignup, onLogout, onMyPage = onHome }: { onHome: () => void; theme: Theme; onToggleTheme: () => void; member: Member | null; onLogin: () => void; onSignup: () => void; onLogout: () => void; onMyPage?: () => void; isAuthReady?: boolean }) {
   const [keyword, setKeyword] = useState("");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>(() => {
@@ -390,7 +390,7 @@ function MyPage({ member, header }: { member: Member; header: ReactNode }) {
 }
 
 
-function MyPage({ member, theme, onToggleTheme, onHome, onLogin, onSignup, onMyPage, onLogout }: { member: Member; theme: Theme; onToggleTheme: () => void; onHome: () => void; onLogin: () => void; onSignup: () => void; onMyPage: () => void; onLogout: () => void }) {
+function LegacyMyPage({ member, theme, onToggleTheme, onHome, onLogin, onSignup, onMyPage, onLogout }: { member: Member; theme: Theme; onToggleTheme: () => void; onHome: () => void; onLogin: () => void; onSignup: () => void; onMyPage: () => void; onLogout: () => void }) {
   const [saved, setSaved] = useState(false);
 
   return <><Header onHome={onHome} theme={theme} onToggleTheme={onToggleTheme} member={member} isAuthReady={true} onLogin={onLogin} onSignup={onSignup} onMyPage={onMyPage} onLogout={onLogout} /><main className="main myPage"><div className="breadcrumbs"><button onClick={onHome}>홈</button><span>›</span><span>마이페이지</span></div><section className="myPageGrid"><section className="myProfileCard"><div className="profileBadge">{member.nickname.slice(0, 1)}</div><div><span className="eyebrow">MY COMMUNITY</span><h1>{member.nickname}님의 마이페이지</h1><p>{member.username} · {member.email}</p></div></section><section className="mySettingsCard"><div className="panelHeading"><div><h2>커뮤니티 설정</h2><p>자주 보는 게시판과 알림을 설정하세요</p></div></div><form onSubmit={(event) => { event.preventDefault(); setSaved(true); }}><label>관심 게시판<select defaultValue="자유 게시판"><option>자유 게시판</option><option>게임 게시판</option><option>공략 게시판</option><option>질문 게시판</option></select></label><label className="checkLabel"><input type="checkbox" defaultChecked /> 인기글 알림 받기</label><label className="checkLabel"><input type="checkbox" defaultChecked /> 내 글의 댓글 알림 받기</label><button className="authSubmit">설정 저장</button>{saved && <p className="settingsSaved">설정이 저장되었습니다.</p>}</form></section></section><section className="myActivity"><h2>나의 활동</h2><div><strong>0</strong><span>작성한 글</span></div><div><strong>0</strong><span>받은 댓글</span></div><div><strong>0</strong><span>북마크</span></div></section></main></>;
