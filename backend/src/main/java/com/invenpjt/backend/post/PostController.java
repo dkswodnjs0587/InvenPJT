@@ -26,18 +26,23 @@ public class PostController {
     }
 
     @GetMapping("/boards/{boardSlug}/posts")
-    public List<PostResponse> getPostsByBoard(@PathVariable String boardSlug) {
-        return postService.getPostsByBoard(boardSlug);
+    public List<PostResponse> getPostsByBoard(@PathVariable String boardSlug, HttpSession session) {
+        return postService.getPostsByBoard(boardSlug, currentMemberId(session));
     }
 
     @GetMapping("/posts/latest")
-    public List<PostResponse> getLatestPosts() {
-        return postService.getLatestPosts();
+    public List<PostResponse> getLatestPosts(HttpSession session) {
+        return postService.getLatestPosts(currentMemberId(session));
+    }
+
+    @GetMapping("/members/me/activity")
+    public MyPageActivityResponse getMyPageActivity(HttpSession session) {
+        return postService.getMyPageActivity(requireMemberId(session));
     }
 
     @GetMapping("/posts/{postId}")
-    public PostResponse getPost(@PathVariable Long postId) {
-        return postService.getPost(postId);
+    public PostResponse getPost(@PathVariable Long postId, HttpSession session) {
+        return postService.getPost(postId, currentMemberId(session));
     }
 
     @PostMapping("/posts")
@@ -55,10 +60,50 @@ public class PostController {
         postService.deletePost(postId, requireMemberId(session));
     }
 
-    private Long requireMemberId(HttpSession session) {
+    @PostMapping("/posts/{postId}/likes")
+    public PostResponse togglePostLike(@PathVariable Long postId, HttpSession session) {
+        return postService.togglePostLike(postId, requireMemberId(session));
+    }
+
+    @PostMapping("/posts/{postId}/dislikes")
+    public PostResponse togglePostDislike(@PathVariable Long postId, HttpSession session) {
+        return postService.togglePostDislike(postId, requireMemberId(session));
+    }
+
+    @PostMapping("/posts/{postId}/bookmarks")
+    public PostResponse togglePostBookmark(@PathVariable Long postId, HttpSession session) {
+        return postService.togglePostBookmark(postId, requireMemberId(session));
+    }
+
+    @GetMapping("/posts/{postId}/comments")
+    public List<CommentResponse> getComments(@PathVariable Long postId, HttpSession session) {
+        return postService.getComments(postId, currentMemberId(session));
+    }
+
+    @PostMapping("/posts/{postId}/comments")
+    public CommentResponse createComment(@PathVariable Long postId, @Valid @RequestBody CommentRequest request, HttpSession session) {
+        return postService.createComment(postId, request, requireMemberId(session));
+    }
+
+    @PostMapping("/comments/{commentId}/likes")
+    public CommentResponse toggleCommentLike(@PathVariable Long commentId, HttpSession session) {
+        return postService.toggleCommentLike(commentId, requireMemberId(session));
+    }
+
+    @PostMapping("/comments/{commentId}/dislikes")
+    public CommentResponse toggleCommentDislike(@PathVariable Long commentId, HttpSession session) {
+        return postService.toggleCommentDislike(commentId, requireMemberId(session));
+    }
+
+    private Long currentMemberId(HttpSession session) {
         Object memberId = session.getAttribute(AuthController.MEMBER_ID);
-        if (memberId instanceof Long id) {
-            return id;
+        return memberId instanceof Long id ? id : null;
+    }
+
+    private Long requireMemberId(HttpSession session) {
+        Long memberId = currentMemberId(session);
+        if (memberId != null) {
+            return memberId;
         }
         throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다.");
     }

@@ -1,4 +1,4 @@
-﻿import { useEffect, useState } from "react";
+﻿import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties, FormEvent, ReactNode } from "react";
 import "./App.css";
 
@@ -22,9 +22,36 @@ type BoardPost = {
   authorId: number | null;
   authorName: string;
   viewCount: number;
+  likeCount: number;
+  dislikeCount: number;
+  commentCount: number;
+  likedByMe: boolean;
+  dislikedByMe: boolean;
+  bookmarkedByMe: boolean;
   createdAt: string;
   updatedAt: string | null;
 };
+
+type BoardComment = {
+  id: number;
+  postId: number;
+  authorId: number;
+  authorName: string;
+  content: string;
+  likeCount: number;
+  dislikeCount: number;
+  likedByMe: boolean;
+  dislikedByMe: boolean;
+  createdAt: string;
+  updatedAt: string | null;
+};
+
+type BoardRoute =
+  | { mode: "list" }
+  | { mode: "write" }
+  | { mode: "detail"; postId: number };
+
+type SortMode = "latest" | "likes" | "views";
 
 type HomePost = {
   board: string;
@@ -49,28 +76,108 @@ type Member = {
   email: string;
 };
 
-function FreeBoard({ onHome, theme, onToggleTheme, member, onLogin, onSignup, onLogout, onMyPage = onHome }: { onHome: () => void; theme: Theme; onToggleTheme: () => void; member: Member | null; onLogin: () => void; onSignup: () => void; onLogout: () => void; onMyPage?: () => void }) {
+type MyPageActivity = {
+  postCount: number;
+  receivedCommentCount: number;
+  favoriteCount: number;
+  myPosts: BoardPost[];
+  favoritePosts: BoardPost[];
+};
+
+type ToastMessage = {
+  id: number;
+  text: string;
+};
+
+function formatBoardTime(createdAt: string) {
+  const date = new Date(createdAt);
+  if (Number.isNaN(date.getTime())) return "-";
+
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const target = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const dayDiff = Math.floor((today.getTime() - target.getTime()) / 86400000);
+
+  if (dayDiff === 0) {
+    return date.toLocaleTimeString("ko-KR", { hour: "2-digit", minute: "2-digit" });
+  }
+  if (dayDiff === 1) return "어제";
+  return date.toLocaleDateString("ko-KR");
+}
+
+function readBoardRoute(): BoardRoute {
+  const params = new URLSearchParams(window.location.search);
+  if (params.get("board") !== "free") return { mode: "list" };
+  if (params.get("mode") === "write") return { mode: "write" };
+  const postId = Number(params.get("post"));
+  if (Number.isInteger(postId) && postId > 0) return { mode: "detail", postId };
+  return { mode: "list" };
+}
+
+function FreeBoard({ onHome, theme, onToggleTheme, member, onLogin, onSignup, onLogout, onMyPage = onHome, onNotify }: { onHome: () => void; theme: Theme; onToggleTheme: () => void; member: Member | null; onLogin: () => void; onSignup: () => void; onLogout: () => void; onMyPage?: () => void; onNotify: (message: string) => void }) {
   const [posts, setPosts] = useState<BoardPost[]>([]);
   const [selectedPost, setSelectedPost] = useState<BoardPost | null>(null);
+  const [comments, setComments] = useState<BoardComment[]>([]);
+  const [boardRoute, setBoardRoute] = useState<BoardRoute>(readBoardRoute);
   const [isWriting, setIsWriting] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [writeTitle, setWriteTitle] = useState("");
   const [writeContent, setWriteContent] = useState("");
   const [editTitle, setEditTitle] = useState("");
   const [editContent, setEditContent] = useState("");
-  const [writeAuthorName, setWriteAuthorName] = useState(member?.nickname || "");
+  const [newComment, setNewComment] = useState("");
+  const [pageSize, setPageSize] = useState(15);
+  const [currentPage, setCurrentPage] = useState(1);
+  const [sortMode, setSortMode] = useState<SortMode>("latest");
   const [isLoading, setIsLoading] = useState(true);
   const [isDetailLoading, setIsDetailLoading] = useState(false);
+  const [isCommentLoading, setIsCommentLoading] = useState(false);
   const [isSubmittingPost, setIsSubmittingPost] = useState(false);
   const [isUpdatingPost, setIsUpdatingPost] = useState(false);
+  const [isSubmittingComment, setIsSubmittingComment] = useState(false);
   const [error, setError] = useState("");
   const [detailError, setDetailError] = useState("");
   const [writeError, setWriteError] = useState("");
   const [editError, setEditError] = useState("");
+  const [commentError, setCommentError] = useState("");
 
-  const formatDate = (createdAt: string) => {
-    const date = new Date(createdAt);
-    return Number.isNaN(date.getTime()) ? "-" : date.toLocaleDateString("ko-KR");
+  const sortedPosts = useMemo(() => {
+    const nextPosts = [...posts];
+    if (sortMode === "likes") {
+      nextPosts.sort((a, b) => (b.likeCount ?? 0) - (a.likeCount ?? 0) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } else if (sortMode === "views") {
+      nextPosts.sort((a, b) => b.viewCount - a.viewCount || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    } else {
+      nextPosts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    }
+    return nextPosts;
+  }, [posts, sortMode]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedPosts.length / pageSize));
+  const safeCurrentPage = Math.min(currentPage, totalPages);
+  const visiblePosts = sortedPosts.slice((safeCurrentPage - 1) * pageSize, safeCurrentPage * pageSize);
+
+  const formatDate = formatBoardTime;
+
+  const buildBoardUrl = (route: BoardRoute) => {
+    const url = new URL(window.location.href);
+    url.search = "";
+    url.searchParams.set("board", "free");
+    if (route.mode === "write") url.searchParams.set("mode", "write");
+    if (route.mode === "detail") url.searchParams.set("post", String(route.postId));
+    return url;
+  };
+
+  const navigateBoard = (route: BoardRoute, replace = false) => {
+    const url = buildBoardUrl(route);
+    window.history[replace ? "replaceState" : "pushState"]({ view: "free", boardRoute: route }, "", url);
+    setBoardRoute(route);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const updatePostInList = (updatedPost: BoardPost) => {
+    setPosts((currentPosts) => currentPosts.map((post) => post.id === updatedPost.id ? updatedPost : post));
+    setSelectedPost((currentPost) => currentPost?.id === updatedPost.id ? updatedPost : currentPost);
   };
 
   const loadPosts = () => {
@@ -89,7 +196,25 @@ function FreeBoard({ onHome, theme, onToggleTheme, member, onLogin, onSignup, on
       .finally(() => setIsLoading(false));
   };
 
-  const openPostDetail = (postId: number) => {
+  const loadComments = (postId: number) => {
+    setIsCommentLoading(true);
+    setCommentError("");
+
+    fetch(`/api/posts/${postId}/comments`, { credentials: "include" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(await readError(response));
+        return await response.json() as BoardComment[];
+      })
+      .then(setComments)
+      .catch((caughtError) => {
+        setCommentError(caughtError instanceof Error ? caughtError.message : "댓글을 불러오지 못했습니다.");
+      })
+      .finally(() => setIsCommentLoading(false));
+  };
+
+  const loadPostDetail = (postId: number) => {
+    setSelectedPost(null);
+    setComments([]);
     setIsDetailLoading(true);
     setDetailError("");
 
@@ -100,8 +225,8 @@ function FreeBoard({ onHome, theme, onToggleTheme, member, onLogin, onSignup, on
       })
       .then((post) => {
         setSelectedPost(post);
-        setPosts((currentPosts) => currentPosts.map((currentPost) => currentPost.id === post.id ? post : currentPost));
-        window.scrollTo({ top: 0, behavior: "smooth" });
+        updatePostInList(post);
+        loadComments(post.id);
       })
       .catch((caughtError) => {
         setDetailError(caughtError instanceof Error ? caughtError.message : "잠시 후 다시 시도해 주세요.");
@@ -114,22 +239,15 @@ function FreeBoard({ onHome, theme, onToggleTheme, member, onLogin, onSignup, on
       onLogin();
       return;
     }
-    setSelectedPost(null);
-    setIsEditing(false);
-    setIsWriting(true);
-    setWriteTitle("");
-    setWriteContent("");
-    setWriteAuthorName(member?.nickname || "");
-    setWriteError("");
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    navigateBoard({ mode: "write" });
   };
 
-  const cancelWrite = () => {
-    setIsWriting(false);
-    setWriteTitle("");
-    setWriteContent("");
-    setWriteAuthorName(member?.nickname || "");
-    setWriteError("");
+  const openPostDetail = (postId: number) => {
+    navigateBoard({ mode: "detail", postId });
+  };
+
+  const backToList = () => {
+    navigateBoard({ mode: "list" });
   };
 
   const submitPost = async (event: FormEvent<HTMLFormElement>) => {
@@ -138,7 +256,6 @@ function FreeBoard({ onHome, theme, onToggleTheme, member, onLogin, onSignup, on
 
     const title = writeTitle.trim();
     const content = writeContent.trim();
-    const authorName = (member?.nickname || writeAuthorName).trim();
 
     if (!title) {
       setWriteError("제목을 입력해 주세요.");
@@ -150,11 +267,6 @@ function FreeBoard({ onHome, theme, onToggleTheme, member, onLogin, onSignup, on
       return;
     }
 
-    if (!authorName) {
-      setWriteError("작성자 이름을 입력해 주세요.");
-      return;
-    }
-
     setIsSubmittingPost(true);
 
     try {
@@ -162,24 +274,17 @@ function FreeBoard({ onHome, theme, onToggleTheme, member, onLogin, onSignup, on
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({
-          boardSlug: "free",
-          title,
-          content,
-        }),
+        body: JSON.stringify({ boardSlug: "free", title, content }),
       });
 
-      if (!response.ok) {
-        throw new Error(await readError(response));
-      }
+      if (!response.ok) throw new Error(await readError(response));
 
       const createdPost = await response.json() as BoardPost;
       setPosts((currentPosts) => [createdPost, ...currentPosts]);
-      setIsWriting(false);
       setWriteTitle("");
       setWriteContent("");
-      setWriteAuthorName(member?.nickname || "");
-      window.scrollTo({ top: 0, behavior: "smooth" });
+      onNotify("글쓰기를 완료했습니다.");
+      navigateBoard({ mode: "list" }, true);
     } catch (caughtError) {
       setWriteError(caughtError instanceof Error ? caughtError.message : "게시글을 등록하지 못했습니다.");
     } finally {
@@ -224,8 +329,7 @@ function FreeBoard({ onHome, theme, onToggleTheme, member, onLogin, onSignup, on
       });
       if (!response.ok) throw new Error(await readError(response));
       const updatedPost = await response.json() as BoardPost;
-      setSelectedPost(updatedPost);
-      setPosts((currentPosts) => currentPosts.map((post) => post.id === updatedPost.id ? updatedPost : post));
+      updatePostInList(updatedPost);
       cancelEdit();
     } catch (caughtError) {
       setEditError(caughtError instanceof Error ? caughtError.message : "게시글을 수정하지 못했습니다.");
@@ -240,9 +344,133 @@ function FreeBoard({ onHome, theme, onToggleTheme, member, onLogin, onSignup, on
       const response = await fetch(`/api/posts/${selectedPost.id}`, { method: "DELETE", credentials: "include" });
       if (!response.ok) throw new Error(await readError(response));
       setPosts((currentPosts) => currentPosts.filter((post) => post.id !== selectedPost.id));
-      setSelectedPost(null);
+      navigateBoard({ mode: "list" }, true);
     } catch (caughtError) {
       setDetailError(caughtError instanceof Error ? caughtError.message : "게시글을 삭제하지 못했습니다.");
+    }
+  };
+
+  const togglePostLike = async (post: BoardPost) => {
+    if (!member) {
+      onLogin();
+      return;
+    }
+    if (post.authorId === member.id) {
+      window.alert("본인 게시글은 추천할 수 없습니다.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/posts/${post.id}/likes`, { method: "POST", credentials: "include" });
+      if (!response.ok) throw new Error(await readError(response));
+      const updatedPost = await response.json() as BoardPost;
+      updatePostInList(updatedPost);
+    } catch (caughtError) {
+      window.alert(caughtError instanceof Error ? caughtError.message : "추천을 처리하지 못했습니다.");
+    }
+  };
+
+  const togglePostDislike = async (post: BoardPost) => {
+    if (!member) {
+      onLogin();
+      return;
+    }
+    if (post.authorId === member.id) {
+      window.alert("본인 게시글은 싫어요할 수 없습니다.");
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/posts/${post.id}/dislikes`, { method: "POST", credentials: "include" });
+      if (!response.ok) throw new Error(await readError(response));
+      const updatedPost = await response.json() as BoardPost;
+      updatePostInList(updatedPost);
+    } catch (caughtError) {
+      window.alert(caughtError instanceof Error ? caughtError.message : "싫어요를 처리하지 못했습니다.");
+    }
+  };
+
+  const togglePostBookmark = async (post: BoardPost) => {
+    if (!member) {
+      onLogin();
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/posts/${post.id}/bookmarks`, { method: "POST", credentials: "include" });
+      if (!response.ok) throw new Error(await readError(response));
+      const updatedPost = await response.json() as BoardPost;
+      updatePostInList(updatedPost);
+    } catch (caughtError) {
+      window.alert(caughtError instanceof Error ? caughtError.message : "즐겨찾기를 처리하지 못했습니다.");
+    }
+  };
+
+  const submitComment = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (!selectedPost) return;
+    if (!member) {
+      onLogin();
+      return;
+    }
+
+    const content = newComment.trim();
+    if (!content) {
+      setCommentError("댓글 내용을 입력해 주세요.");
+      return;
+    }
+
+    setIsSubmittingComment(true);
+    setCommentError("");
+    try {
+      const response = await fetch(`/api/posts/${selectedPost.id}/comments`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ content }),
+      });
+      if (!response.ok) throw new Error(await readError(response));
+      const createdComment = await response.json() as BoardComment;
+      setComments((currentComments) => [...currentComments, createdComment]);
+      setNewComment("");
+      setSelectedPost((currentPost) => currentPost ? { ...currentPost, commentCount: (currentPost.commentCount ?? 0) + 1 } : currentPost);
+      setPosts((currentPosts) => currentPosts.map((post) => post.id === selectedPost.id ? { ...post, commentCount: (post.commentCount ?? 0) + 1 } : post));
+    } catch (caughtError) {
+      setCommentError(caughtError instanceof Error ? caughtError.message : "댓글을 등록하지 못했습니다.");
+    } finally {
+      setIsSubmittingComment(false);
+    }
+  };
+
+  const toggleCommentLike = async (commentId: number) => {
+    if (!member) {
+      onLogin();
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/comments/${commentId}/likes`, { method: "POST", credentials: "include" });
+      if (!response.ok) throw new Error(await readError(response));
+      const updatedComment = await response.json() as BoardComment;
+      setComments((currentComments) => currentComments.map((comment) => comment.id === updatedComment.id ? updatedComment : comment));
+    } catch (caughtError) {
+      window.alert(caughtError instanceof Error ? caughtError.message : "댓글 추천을 처리하지 못했습니다.");
+    }
+  };
+
+  const toggleCommentDislike = async (commentId: number) => {
+    if (!member) {
+      onLogin();
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/comments/${commentId}/dislikes`, { method: "POST", credentials: "include" });
+      if (!response.ok) throw new Error(await readError(response));
+      const updatedComment = await response.json() as BoardComment;
+      setComments((currentComments) => currentComments.map((comment) => comment.id === updatedComment.id ? updatedComment : comment));
+    } catch (caughtError) {
+      window.alert(caughtError instanceof Error ? caughtError.message : "댓글 싫어요를 처리하지 못했습니다.");
     }
   };
 
@@ -251,10 +479,54 @@ function FreeBoard({ onHome, theme, onToggleTheme, member, onLogin, onSignup, on
   }, []);
 
   useEffect(() => {
-    if (member?.nickname) {
-      setWriteAuthorName(member.nickname);
+    const onPopState = () => {
+      setBoardRoute(readBoardRoute());
+      window.scrollTo(0, 0);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => window.removeEventListener("popstate", onPopState);
+  }, []);
+
+  useEffect(() => {
+    if (boardRoute.mode === "list") {
+      setIsWriting(false);
+      setIsEditing(false);
+      setSelectedPost(null);
+      setComments([]);
+      setDetailError("");
+      setWriteError("");
+      return;
     }
-  }, [member]);
+
+    if (boardRoute.mode === "write") {
+      if (!member) {
+        onLogin();
+        return;
+      }
+      setSelectedPost(null);
+      setComments([]);
+      setIsEditing(false);
+      setIsWriting(true);
+      setWriteTitle("");
+      setWriteContent("");
+      setWriteError("");
+      return;
+    }
+
+    setIsWriting(false);
+    setIsEditing(false);
+    loadPostDetail(boardRoute.postId);
+  }, [boardRoute.mode, boardRoute.mode === "detail" ? boardRoute.postId : 0, member?.id]);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [pageSize, sortMode]);
+
+  useEffect(() => {
+    if (currentPage > totalPages) setCurrentPage(totalPages);
+  }, [currentPage, totalPages]);
+
+  const pageNumbers = Array.from({ length: totalPages }, (_, index) => index + 1);
 
   return (
     <>
@@ -289,128 +561,82 @@ function FreeBoard({ onHome, theme, onToggleTheme, member, onLogin, onSignup, on
         </section>
 
         {isWriting ? (
-          <section className="boardTable" style={{ marginTop: 16 }}>
-            <div className="tableTools">
-              <b>게시글 작성</b>
-              <div>
-                <button type="button" className="sortSelected" onClick={cancelWrite}>목록으로</button>
+          <>
+            <section className="boardTable writePanel" style={{ marginTop: 16 }}>
+              <div className="tableTools">
+                <b>게시글 작성</b>
+                <button type="button" className="sortSelected" onClick={backToList}>목록으로</button>
               </div>
-            </div>
 
-            <form onSubmit={submitPost} style={{ display: "grid", gap: 14, padding: "24px 26px" }}>
-              <label style={{ display: "grid", gap: 7, color: "var(--text)", fontSize: 13, fontWeight: 800 }}>
-                제목
-                <input
-                  value={writeTitle}
-                  onChange={(event) => setWriteTitle(event.target.value)}
-                  placeholder="제목을 입력해 주세요"
-                  maxLength={200}
-                  required
-                  style={{
-                    height: 44,
-                    padding: "0 13px",
-                    border: "1px solid var(--border)",
-                    borderRadius: 8,
-                    background: "var(--surface-soft)",
-                    color: "var(--text)",
-                  }}
-                />
-              </label>
-
-              {!member && (
-                <label style={{ display: "grid", gap: 7, color: "var(--text)", fontSize: 13, fontWeight: 800 }}>
-                  작성자
+              <form id="free-post-form" className="postWriteForm" onSubmit={submitPost}>
+                <label>
+                  제목
                   <input
-                    value={writeAuthorName}
-                    onChange={(event) => setWriteAuthorName(event.target.value)}
-                    placeholder="작성자 이름"
-                    maxLength={50}
+                    value={writeTitle}
+                    onChange={(event) => setWriteTitle(event.target.value)}
+                    placeholder="제목을 입력해 주세요"
+                    maxLength={200}
                     required
-                    style={{
-                      height: 44,
-                      padding: "0 13px",
-                      border: "1px solid var(--border)",
-                      borderRadius: 8,
-                      background: "var(--surface-soft)",
-                      color: "var(--text)",
-                    }}
                   />
                 </label>
-              )}
 
-              {member && (
-                <p style={{ margin: 0, color: "var(--muted)", fontSize: 13 }}>
-                  작성자: <b style={{ color: "var(--text)" }}>{member.nickname}</b>
-                </p>
-              )}
+                {member && (
+                  <p className="writerLine">
+                    작성자: <b>{member.nickname}</b>
+                  </p>
+                )}
 
-              <label style={{ display: "grid", gap: 7, color: "var(--text)", fontSize: 13, fontWeight: 800 }}>
-                내용
-                <textarea
-                  value={writeContent}
-                  onChange={(event) => setWriteContent(event.target.value)}
-                  placeholder="내용을 입력해 주세요"
-                  required
-                  rows={12}
-                  style={{
-                    resize: "vertical",
-                    minHeight: 220,
-                    padding: 13,
-                    border: "1px solid var(--border)",
-                    borderRadius: 8,
-                    background: "var(--surface-soft)",
-                    color: "var(--text)",
-                    font: "inherit",
-                    lineHeight: 1.6,
-                  }}
-                />
-              </label>
+                <label>
+                  내용
+                  <textarea
+                    value={writeContent}
+                    onChange={(event) => setWriteContent(event.target.value)}
+                    placeholder="내용을 입력해 주세요"
+                    required
+                    rows={12}
+                  />
+                </label>
 
-              {writeError && (
-                <p className="authError" style={{ margin: 0 }}>{writeError}</p>
-              )}
-
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
-                <button type="button" className="authCancel" onClick={cancelWrite}>취소</button>
-                <button className="authSubmit" disabled={isSubmittingPost} style={{ width: 110 }}>
-                  {isSubmittingPost ? "등록 중..." : "등록"}
-                </button>
-              </div>
-            </form>
-          </section>
+                {writeError && <p className="authError" style={{ margin: 0 }}>{writeError}</p>}
+              </form>
+            </section>
+            <div className="writeSubmitBar">
+              <button form="free-post-form" className="authSubmit writeSubmitButton" disabled={isSubmittingPost}>
+                {isSubmittingPost ? "등록 중..." : "등록"}
+              </button>
+            </div>
+          </>
         ) : isEditing && selectedPost ? (
           <section className="boardTable" style={{ marginTop: 16 }}>
             <div className="tableTools">
               <b>게시글 수정</b>
               <button type="button" className="sortSelected" onClick={cancelEdit}>취소</button>
             </div>
-            <form onSubmit={submitEdit} style={{ display: "grid", gap: 14, padding: "24px 26px" }}>
-              <label style={{ display: "grid", gap: 7, color: "var(--text)", fontSize: 13, fontWeight: 800 }}>
+            <form className="postWriteForm" onSubmit={submitEdit}>
+              <label>
                 제목
-                <input value={editTitle} onChange={(event) => setEditTitle(event.target.value)} maxLength={200} required style={{ height: 44, padding: "0 13px", border: "1px solid var(--border)", borderRadius: 8, background: "var(--surface-soft)", color: "var(--text)" }} />
+                <input value={editTitle} onChange={(event) => setEditTitle(event.target.value)} maxLength={200} required />
               </label>
-              <label style={{ display: "grid", gap: 7, color: "var(--text)", fontSize: 13, fontWeight: 800 }}>
+              <label>
                 내용
-                <textarea value={editContent} onChange={(event) => setEditContent(event.target.value)} rows={12} required style={{ resize: "vertical", minHeight: 220, padding: 13, border: "1px solid var(--border)", borderRadius: 8, background: "var(--surface-soft)", color: "var(--text)", font: "inherit", lineHeight: 1.6 }} />
+                <textarea value={editContent} onChange={(event) => setEditContent(event.target.value)} rows={12} required />
               </label>
               {editError && <p className="authError" style={{ margin: 0 }}>{editError}</p>}
-              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+              <div className="formActions">
                 <button type="button" className="authCancel" onClick={cancelEdit}>취소</button>
-                <button className="authSubmit" disabled={isUpdatingPost} style={{ width: 110 }}>{isUpdatingPost ? "수정 중..." : "수정 완료"}</button>
+                <button className="authSubmit" disabled={isUpdatingPost}>{isUpdatingPost ? "수정 중..." : "수정 완료"}</button>
               </div>
             </form>
           </section>
-        ) : selectedPost ? (
-          <section className="boardTable" style={{ marginTop: 16 }}>
+        ) : boardRoute.mode === "detail" ? (
+          <section className="boardTable detailPanel" style={{ marginTop: 16 }}>
             <div className="tableTools">
               <b>게시글 상세</b>
-              <div>
-                <button type="button" className="sortSelected" onClick={() => setSelectedPost(null)}>목록으로</button>
-              </div>
+              <button type="button" className="sortSelected" onClick={backToList}>목록으로</button>
             </div>
 
-            {isDetailLoading && (
-              <article className="postRow">
+            {isDetailLoading && !selectedPost && (
+              <article className="postRow emptyRow">
                 <span>-</span>
                 <span>게시글을 불러오는 중입니다.</span>
                 <span>-</span>
@@ -421,7 +647,7 @@ function FreeBoard({ onHome, theme, onToggleTheme, member, onLogin, onSignup, on
             )}
 
             {detailError && (
-              <article className="postRow">
+              <article className="postRow emptyRow">
                 <span>-</span>
                 <span>{detailError}</span>
                 <span>-</span>
@@ -431,138 +657,203 @@ function FreeBoard({ onHome, theme, onToggleTheme, member, onLogin, onSignup, on
               </article>
             )}
 
-            {!isDetailLoading && !detailError && (
-              <article style={{ padding: "28px 30px" }}>
-                <div style={{ display: "flex", justifyContent: "space-between", gap: 16, borderBottom: "1px solid var(--row-border)", paddingBottom: 18 }}>
+            {selectedPost && !detailError && (
+              <article className="postDetailArticle">
+                <div className="postDetailHeader">
                   <div>
-                    <h2 style={{ margin: 0, fontSize: 24 }}>{selectedPost.title}</h2>
-                    <p style={{ margin: "10px 0 0", color: "var(--muted)", fontSize: 13 }}>
-                      {selectedPost.authorName} · {formatDate(selectedPost.createdAt)} · 조회 {selectedPost.viewCount}
-                    </p>
+                    <h2>{selectedPost.title}</h2>
+                    <p>{selectedPost.authorName} · {formatDate(selectedPost.createdAt)} · 조회 {selectedPost.viewCount} · 댓글 {selectedPost.commentCount ?? 0}</p>
                   </div>
-                  <div style={{ display: "flex", gap: 8 }}>
+                  <div className="postDetailActions">
+                    <button
+                      type="button"
+                      className={`detailBookmarkButton bookmarkButton ${selectedPost.bookmarkedByMe ? "active" : ""}`}
+                      onClick={() => togglePostBookmark(selectedPost)}
+                      aria-label={selectedPost.bookmarkedByMe ? "즐겨찾기 해제" : "즐겨찾기"}
+                      title={selectedPost.bookmarkedByMe ? "즐겨찾기 해제" : "즐겨찾기"}
+                    >
+                      {selectedPost.bookmarkedByMe ? "★" : "☆"}
+                    </button>
+                    <button
+                      type="button"
+                      className={`recommendButton ${selectedPost.likedByMe ? "active" : ""}`}
+                      onClick={() => togglePostLike(selectedPost)}
+                      disabled={isMyPost(selectedPost)}
+                      title={isMyPost(selectedPost) ? "본인 게시글은 추천할 수 없습니다." : "게시글 추천"}
+                    >
+                      👍 추천 {selectedPost.likeCount ?? 0}
+                    </button>
+                    <button
+                      type="button"
+                      className={`recommendButton dislikeButton ${selectedPost.dislikedByMe ? "active" : ""}`}
+                      onClick={() => togglePostDislike(selectedPost)}
+                      disabled={isMyPost(selectedPost)}
+                      title={isMyPost(selectedPost) ? "본인 게시글은 싫어요할 수 없습니다." : "게시글 싫어요"}
+                    >
+                      👎 싫어요 {selectedPost.dislikeCount ?? 0}
+                    </button>
                     {isMyPost(selectedPost) && <>
                       <button type="button" className="textButton" onClick={beginEdit}>수정</button>
                       <button type="button" className="textButton" onClick={deleteSelectedPost}>삭제</button>
                     </>}
-                    <button type="button" className="textButton" onClick={() => setSelectedPost(null)}>목록</button>
+                    <button type="button" className="textButton" onClick={backToList}>목록</button>
                   </div>
                 </div>
 
-                <div style={{ minHeight: 220, paddingTop: 24, whiteSpace: "pre-wrap", lineHeight: 1.75, color: "var(--text)" }}>
-                  {selectedPost.content}
-                </div>
+                <div className="postDetailContent">{selectedPost.content}</div>
+
+                <section className="commentSection">
+                  <div className="commentHeader">
+                    <h3>댓글 <strong>{comments.length}</strong></h3>
+                    {isCommentLoading && <span>불러오는 중...</span>}
+                  </div>
+
+                  {commentError && <p className="authError commentError">{commentError}</p>}
+
+                  <div className="commentList">
+                    {!isCommentLoading && comments.length === 0 && <p className="emptyComment">아직 댓글이 없습니다. 첫 댓글을 남겨보세요.</p>}
+                    {comments.map((comment) => (
+                      <article className="commentItem" key={comment.id}>
+                        <div>
+                          <b>{comment.authorName}</b>
+                          <span>{formatDate(comment.createdAt)}</span>
+                        </div>
+                        <p>{comment.content}</p>
+                        <div className="commentVoteGroup">
+                          <button type="button" className={`commentLikeButton ${comment.likedByMe ? "active" : ""}`} onClick={() => toggleCommentLike(comment.id)}>
+                            👍 {comment.likeCount ?? 0}
+                          </button>
+                          <button type="button" className={`commentLikeButton dislikeButton ${comment.dislikedByMe ? "active" : ""}`} onClick={() => toggleCommentDislike(comment.id)}>
+                            👎 {comment.dislikeCount ?? 0}
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+
+                  <form className="commentForm" onSubmit={submitComment}>
+                    <textarea value={newComment} onChange={(event) => setNewComment(event.target.value)} placeholder={member ? "댓글을 입력해 주세요" : "로그인 후 댓글을 작성할 수 있습니다."} rows={4} />
+                    <button className="authSubmit" disabled={isSubmittingComment}>{isSubmittingComment ? "등록 중..." : "댓글 등록"}</button>
+                  </form>
+                </section>
               </article>
             )}
           </section>
         ) : (
-          <>
-            <section className="boardTabs">
-              <button className="selected">전체</button>
-              <button>잡담</button>
-              <button>질문</button>
-              <button>정보</button>
-              <button>공략</button>
-              <button>인증</button>
-            </section>
-
-            <div className="boardLayout">
-              <section className="boardTable">
-                <div className="tableTools">
-                  <b>전체 글 <strong>{posts.length}</strong></b>
-                  <div>
-                    <button className="sortSelected">최신순</button>
-                    <button>추천순</button>
-                    <button>조회순</button>
-                  </div>
+          <div className="boardLayout boardLayoutWide">
+            <section className="boardTable">
+              <div className="tableTools boardTableTools">
+                <b>전체 글 <strong>{posts.length}</strong></b>
+                <div className="boardListControls">
+                  <label>
+                    보기
+                    <select value={pageSize} onChange={(event) => setPageSize(Number(event.target.value))}>
+                      <option value={15}>15개씩</option>
+                      <option value={20}>20개씩</option>
+                    </select>
+                  </label>
+                  <button type="button" className={sortMode === "latest" ? "sortSelected" : ""} onClick={() => setSortMode("latest")}>최신순</button>
+                  <button type="button" className={sortMode === "likes" ? "sortSelected" : ""} onClick={() => setSortMode("likes")}>추천순</button>
+                  <button type="button" className={sortMode === "views" ? "sortSelected" : ""} onClick={() => setSortMode("views")}>조회순</button>
                 </div>
+              </div>
 
-                <div className="tableHead">
-                  <span>번호</span>
-                  <span>제목</span>
-                  <span>글쓴이</span>
-                  <span>작성일</span>
-                  <span>조회</span>
-                  <span>추천</span>
-                </div>
+              <div className="tableHead">
+                <span>즐겨찾기</span>
+                <span>번호</span>
+                <span>제목</span>
+                <span>글쓴이</span>
+                <span>작성일</span>
+                <span>조회</span>
+                <span>추천/싫어요</span>
+              </div>
 
-                {isLoading && (
-                  <article className="postRow">
-                    <span>-</span>
-                    <span>게시글을 불러오는 중입니다.</span>
-                    <span>-</span>
-                    <span>-</span>
-                    <span>-</span>
-                    <span>-</span>
-                  </article>
-                )}
+              {isLoading && (
+                <article className="postRow emptyRow">
+                  <span>-</span>
+                  <span>게시글을 불러오는 중입니다.</span>
+                  <span>-</span>
+                  <span>-</span>
+                  <span>-</span>
+                  <span>-</span>
+                </article>
+              )}
 
-                {error && (
-                  <article className="postRow">
-                    <span>-</span>
-                    <span>{error}</span>
-                    <span>-</span>
-                    <span>-</span>
-                    <span>-</span>
-                    <span>-</span>
-                  </article>
-                )}
+              {error && (
+                <article className="postRow emptyRow">
+                  <span>-</span>
+                  <span>{error}</span>
+                  <span>-</span>
+                  <span>-</span>
+                  <span>-</span>
+                  <span>-</span>
+                </article>
+              )}
 
-                {!isLoading && !error && posts.length === 0 && (
-                  <article className="postRow">
-                    <span>-</span>
-                    <span>아직 등록된 게시글이 없습니다.</span>
-                    <span>-</span>
-                    <span>-</span>
-                    <span>-</span>
-                    <span>-</span>
-                  </article>
-                )}
+              {!isLoading && !error && posts.length === 0 && (
+                <article className="postRow emptyRow">
+                  <span>-</span>
+                  <span>아직 등록된 게시글이 없습니다.</span>
+                  <span>-</span>
+                  <span>-</span>
+                  <span>-</span>
+                  <span>-</span>
+                </article>
+              )}
 
-                {!isLoading && !error && posts.map((post) => (
-                  <article className="postRow" key={post.id}>
-                    <span>{post.id}</span>
-                    <button type="button" className="postLink" onClick={() => openPostDetail(post.id)}>
-                      {post.title}
-                      <small> [0]</small>
+              {!isLoading && !error && visiblePosts.map((post) => (
+                <article className="postRow" key={post.id}>
+                  <span>
+                    <button
+                      type="button"
+                      className={`bookmarkButton ${post.bookmarkedByMe ? "active" : ""}`}
+                      onClick={() => togglePostBookmark(post)}
+                      aria-label={post.bookmarkedByMe ? "즐겨찾기 해제" : "즐겨찾기"}
+                      title={post.bookmarkedByMe ? "즐겨찾기 해제" : "즐겨찾기"}
+                    >
+                      {post.bookmarkedByMe ? "★" : "☆"}
                     </button>
-                    <span>{post.authorName}</span>
-                    <span>{formatDate(post.createdAt)}</span>
-                    <span>{post.viewCount}</span>
-                    <span>0</span>
-                  </article>
+                  </span>
+                  <span>{post.id}</span>
+                  <button type="button" className="postLink" onClick={() => openPostDetail(post.id)}>
+                    {post.title}
+                    <small> [{post.commentCount ?? 0}]</small>
+                  </button>
+                  <span>{post.authorName}</span>
+                  <span>{formatDate(post.createdAt)}</span>
+                  <span>{post.viewCount}</span>
+                  <span className="listVoteCell">
+                    <button
+                      type="button"
+                      className={`miniLikeButton ${post.likedByMe ? "active" : ""}`}
+                      onClick={() => togglePostLike(post)}
+                      disabled={member?.id === post.authorId}
+                      title={member?.id === post.authorId ? "본인 게시글은 추천할 수 없습니다." : "추천"}
+                    >
+                      👍 {post.likeCount ?? 0}
+                    </button>
+                    <button
+                      type="button"
+                      className={`miniLikeButton dislikeButton ${post.dislikedByMe ? "active" : ""}`}
+                      onClick={() => togglePostDislike(post)}
+                      disabled={member?.id === post.authorId}
+                      title={member?.id === post.authorId ? "본인 게시글은 싫어요할 수 없습니다." : "싫어요"}
+                    >
+                      👎 {post.dislikeCount ?? 0}
+                    </button>
+                  </span>
+                </article>
+              ))}
+
+              <div className="pagination">
+                <button type="button" onClick={() => setCurrentPage((page) => Math.max(1, page - 1))} disabled={safeCurrentPage === 1}>‹</button>
+                {pageNumbers.map((page) => (
+                  <button type="button" key={page} className={page === safeCurrentPage ? "current" : ""} onClick={() => setCurrentPage(page)}>{page}</button>
                 ))}
-
-                <div className="pagination">
-                  <button>‹</button>
-                  <button className="current">1</button>
-                  <button>2</button>
-                  <button>3</button>
-                  <button>4</button>
-                  <button>5</button>
-                  <button>›</button>
-                </div>
-              </section>
-
-              <aside className="boardAside">
-                <section>
-                  <h2>자유 게시판 인기글</h2>
-                  <ol>
-                    {posts.slice(0, 5).map((post) => (
-                      <li key={`popular-${post.id}`}>{post.title}</li>
-                    ))}
-                    {posts.length === 0 && <li>게시글이 등록되면 표시됩니다.</li>}
-                  </ol>
-                </section>
-
-                <section className="asideNotice">
-                  <b>처음 오셨나요?</b>
-                  <p>게시판 이용 수칙을 확인하고 즐겁게 참여해 주세요.</p>
-                  <a href="#guide">이용 안내 보기 →</a>
-                </section>
-              </aside>
-            </div>
-          </>
+                <button type="button" onClick={() => setCurrentPage((page) => Math.min(totalPages, page + 1))} disabled={safeCurrentPage === totalPages}>›</button>
+              </div>
+            </section>
+          </div>
         )}
       </main>
     </>
@@ -601,15 +892,14 @@ function getCachedMember(): Member | null {
 }
 
 async function readError(response: Response) {
-  if (response.status === 401) return "아이디 또는 비밀번호가 올바르지 않습니다.";
+  if (response.status === 401) return "로그인이 필요하거나 아이디/비밀번호가 올바르지 않습니다.";
   if (response.status === 409) return "이미 사용 중인 아이디, 닉네임 또는 이메일입니다.";
-  if (response.status === 400) return "입력한 정보를 다시 확인해 주세요.";
   const contentType = response.headers.get("content-type") || "";
   if (contentType.includes("application/json")) {
     const body = await response.json() as { message?: string; detail?: string; errors?: Array<{ defaultMessage?: string }> };
-    return body.errors?.[0]?.defaultMessage || body.detail || body.message || "요청을 처리하지 못했습니다.";
+    return body.errors?.[0]?.defaultMessage || body.detail || body.message || (response.status === 400 ? "입력한 정보를 다시 확인해 주세요." : "요청을 처리하지 못했습니다.");
   }
-  return (await response.text()) || "요청을 처리하지 못했습니다.";
+  return (await response.text()) || (response.status === 400 ? "입력한 정보를 다시 확인해 주세요." : "요청을 처리하지 못했습니다.");
 }
 
 const categories: Category[] = [
@@ -821,7 +1111,7 @@ function Home({ onOpenFreeBoard, onOpenLounge, theme, onToggleTheme, member, onL
   );
 }
 
-function EnhancedAuthPage({ mode, theme, onToggleTheme, onHome, onModeChange, onSuccess }: { mode: "login" | "signup"; theme: Theme; onToggleTheme: () => void; onHome: () => void; onModeChange: (mode: View) => void; onSuccess: (member: Member) => void }) {
+function EnhancedAuthPage({ mode, theme, onToggleTheme, onHome, onModeChange, onSuccess, onToast }: { mode: "login" | "signup"; theme: Theme; onToggleTheme: () => void; onHome: () => void; onModeChange: (mode: View) => void; onSuccess: (member: Member) => void; onToast: (message: string) => void }) {
   const isSignup = mode === "signup";
   const [username, setUsername] = useState("");
   const [nickname, setNickname] = useState("");
@@ -887,6 +1177,7 @@ function EnhancedAuthPage({ mode, theme, onToggleTheme, onHome, onModeChange, on
       if (!response.ok) throw new Error(await readError(response));
       const loggedIn = await response.json() as Member;
       if (isSignup) {
+        onToast("회원가입이 성공적으로 되었습니다.");
         onModeChange("login");
         return;
       }
@@ -934,10 +1225,72 @@ function LolLounge({ header }: { header: ReactNode }) {
 
 function MyPageModal({ member, onClose }: { member: Member; onClose: () => void }) {
   const [saved, setSaved] = useState(false);
+  const [activity, setActivity] = useState<MyPageActivity | null>(null);
+  const [activityError, setActivityError] = useState("");
 
-  return <div className="modalOverlay" role="presentation" onMouseDown={onClose}><section className="myPageModal" role="dialog" aria-modal="true" aria-labelledby="my-page-title" onMouseDown={(event) => event.stopPropagation()}><div className="modalHeader"><div><span className="eyebrow">MY LOUNGE</span><h1 id="my-page-title">마이페이지</h1></div><button className="modalClose" type="button" aria-label="마이페이지 닫기" onClick={onClose}>×</button></div><section className="myPageGrid"><section className="myProfileCard"><div className="profileBadge">{member.nickname.slice(0, 1)}</div><div><span className="eyebrow">MY LOUNGE</span><h1>{member.nickname}님의 라운지</h1><p>{member.username} · {member.email || "이메일 미등록"}</p></div></section><section className="mySettingsCard"><div className="panelHeading"><div><h2>커뮤니티 설정</h2><p>나에게 맞는 라운지를 설정하세요</p></div></div><form onSubmit={(event) => { event.preventDefault(); setSaved(true); }}><label>관심 게시판<select defaultValue="자유 게시판"><option>자유 게시판</option><option>게임 게시판</option><option>공략 게시판</option></select></label><label className="checkLabel"><input type="checkbox" defaultChecked /> 인기글 알림 받기</label><label className="checkLabel"><input type="checkbox" defaultChecked /> 내 글의 댓글 알림 받기</label><button className="authSubmit">설정 저장</button>{saved && <p className="settingsSaved">설정이 저장되었습니다.</p>}</form></section></section><section className="myActivity"><h2>나의 활동</h2><div><strong>0</strong><span>작성한 글</span></div><div><strong>0</strong><span>받은 댓글</span></div><div><strong>0</strong><span>북마크</span></div></section></section></div>;
+  useEffect(() => {
+    let active = true;
+    fetch("/api/members/me/activity", { credentials: "include" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error(await readError(response));
+        return await response.json() as MyPageActivity;
+      })
+      .then((nextActivity) => { if (active) setActivity(nextActivity); })
+      .catch((caughtError) => {
+        if (active) setActivityError(caughtError instanceof Error ? caughtError.message : "마이페이지 정보를 불러오지 못했습니다.");
+      });
+    return () => { active = false; };
+  }, []);
+
+  const renderPostList = (posts: BoardPost[], emptyText: string) => (
+    <ul className="myPostMiniList">
+      {posts.length === 0 && <li className="emptyMyPost">{emptyText}</li>}
+      {posts.map((post) => (
+        <li key={post.id}>
+          <span>{post.boardName}</span>
+          <b>{post.title}</b>
+          <small>{formatBoardTime(post.createdAt)} · 댓글 {post.commentCount ?? 0} · 추천 {post.likeCount ?? 0}</small>
+        </li>
+      ))}
+    </ul>
+  );
+
+  return (
+    <div className="modalOverlay" role="presentation" onMouseDown={onClose}>
+      <section className="myPageModal" role="dialog" aria-modal="true" aria-labelledby="my-page-title" onMouseDown={(event) => event.stopPropagation()}>
+        <div className="modalHeader">
+          <div>
+            <span className="eyebrow">MY LOUNGE</span>
+            <h1 id="my-page-title">마이페이지</h1>
+          </div>
+          <button className="modalClose" type="button" aria-label="마이페이지 닫기" onClick={onClose}>×</button>
+        </div>
+        <section className="myPageGrid">
+          <section className="myProfileCard">
+            <div className="profileBadge">{member.nickname.slice(0, 1)}</div>
+            <div><span className="eyebrow">MY LOUNGE</span><h1>{member.nickname}님의 라운지</h1><p>{member.username} · {member.email || "이메일 없음"}</p></div>
+          </section>
+          <section className="mySettingsCard">
+            <div className="panelHeading"><div><h2>개인 설정</h2><p>라운지 이용 환경을 설정하세요</p></div></div>
+            <form onSubmit={(event) => { event.preventDefault(); setSaved(true); }}>
+              <label>선호 테마<select defaultValue="시스템 설정"><option>시스템 설정</option><option>라이트 모드</option><option>다크 모드</option></select></label>
+              <label className="checkLabel"><input type="checkbox" defaultChecked /> 댓글 알림 받기</label>
+              <label className="checkLabel"><input type="checkbox" defaultChecked /> 내 글 반응 알림 받기</label>
+              <button className="authSubmit">설정 저장</button>
+              {saved && <p className="settingsSaved">설정이 저장되었습니다.</p>}
+            </form>
+          </section>
+        </section>
+        <section className="myActivity"><h2>활동 요약</h2><div><strong>{activity?.postCount ?? 0}</strong><span>내가 쓴 게시글</span></div><div><strong>{activity?.receivedCommentCount ?? 0}</strong><span>받은 댓글</span></div><div><strong>{activity?.favoriteCount ?? 0}</strong><span>즐겨찾기</span></div></section>
+        {activityError && <p className="authError myPageError">{activityError}</p>}
+        <section className="myActivityBoards">
+          <article><div className="panelHeading"><div><h2>내가 쓴 게시글</h2><p>최근 작성한 글</p></div></div>{activity ? renderPostList(activity.myPosts, "아직 작성한 게시글이 없습니다.") : <p className="emptyMyPost">불러오는 중...</p>}</article>
+          <article><div className="panelHeading"><div><h2>즐겨찾기</h2><p>별표한 게시글</p></div></div>{activity ? renderPostList(activity.favoritePosts, "아직 즐겨찾기한 게시글이 없습니다.") : <p className="emptyMyPost">불러오는 중...</p>}</article>
+        </section>
+      </section>
+    </div>
+  );
 }
-
 
 function EnhancedApp() {
   const [activeView, setActiveView] = useState<View>(readView);
@@ -945,6 +1298,7 @@ function EnhancedApp() {
   const [sessionChecked, setSessionChecked] = useState(false);
   const [authReturnView, setAuthReturnView] = useState<View>("home");
   const [isMyPageOpen, setIsMyPageOpen] = useState(false);
+  const [toast, setToast] = useState<ToastMessage | null>(null);
   const [theme, setTheme] = useState<Theme>(() => {
     const savedTheme = localStorage.getItem("theme");
     if (savedTheme === "light" || savedTheme === "dark") return savedTheme;
@@ -955,6 +1309,14 @@ function EnhancedApp() {
     setMember(next);
     if (next) localStorage.setItem(MEMBER_CACHE_KEY, JSON.stringify(next));
     else localStorage.removeItem(MEMBER_CACHE_KEY);
+  };
+
+  const notify = (message: string) => {
+    const id = Date.now();
+    setToast({ id, text: message });
+    window.setTimeout(() => {
+      setToast((current) => current?.id === id ? null : current);
+    }, 2600);
   };
 
   const navigate = (nextView: View, replace = false) => {
@@ -975,13 +1337,15 @@ function EnhancedApp() {
     }
   };
 
+  const getAuthReturnView = () => activeView === "lol" ? "lol" : activeView === "free" ? "free" : "home";
+
   const goLogin = () => {
-    setAuthReturnView(activeView === "lol" ? "lol" : "home");
+    setAuthReturnView(getAuthReturnView());
     navigate("login");
   };
 
   const goSignup = () => {
-    setAuthReturnView(activeView === "lol" ? "lol" : "home");
+    setAuthReturnView(getAuthReturnView());
     navigate("signup");
   };
 
@@ -1038,10 +1402,16 @@ function EnhancedApp() {
     if (sessionChecked && activeView === "mypage" && !member) goLogin();
   }, [activeView, member, sessionChecked]);
 
+  useEffect(() => {
+    if (member && (activeView === "login" || activeView === "signup")) {
+      navigate(authReturnView === "login" || authReturnView === "signup" ? "home" : authReturnView, true);
+    }
+  }, [activeView, member?.id]);
+
   const isLolView = activeView === "lol";
   const header = <Header onHome={() => navigate(isLolView ? "lol" : "home")} theme={theme} onToggleTheme={toggleTheme} member={member} onLogin={goLogin} onSignup={goSignup} onLogout={logout} onMyPage={openMyPage} onMainHome={() => navigate("home")} variant={isLolView ? "lol" : "main"} showHomeButton={isLolView} />;
 
-  return <div className="app">{activeView === "lol" && <LolLounge header={header} />}{activeView === "free" && <FreeBoard onHome={() => navigate("home")} theme={theme} onToggleTheme={toggleTheme} member={member} onLogin={goLogin} onSignup={goSignup} onLogout={logout} onMyPage={openMyPage} />}{activeView === "home" && <Home onOpenFreeBoard={openFreeBoard} onOpenLounge={openLounge} theme={theme} onToggleTheme={toggleTheme} member={member} onLogin={goLogin} onSignup={goSignup} onLogout={logout} onMyPage={openMyPage} />}{(activeView === "login" || activeView === "signup") && <EnhancedAuthPage mode={activeView} theme={theme} onToggleTheme={toggleTheme} onHome={() => navigate("home")} onModeChange={(nextView) => navigate(nextView)} onSuccess={(loggedIn) => { updateMember(loggedIn); navigate(authReturnView, true); }} />}{member && isMyPageOpen && <MyPageModal member={member} onClose={() => setIsMyPageOpen(false)} />}<footer className="footer"><strong>LOUNGE COMMUNITY</strong><span>좋아하는 주제로 모이고 이야기하는 공간</span><span>© LOUNGE. All rights reserved.</span></footer></div>;
+  return <div className="app">{activeView === "lol" && <LolLounge header={header} />}{activeView === "free" && <FreeBoard onHome={() => navigate("home")} theme={theme} onToggleTheme={toggleTheme} member={member} onLogin={goLogin} onSignup={goSignup} onLogout={logout} onMyPage={openMyPage} onNotify={notify} />}{activeView === "home" && <Home onOpenFreeBoard={openFreeBoard} onOpenLounge={openLounge} theme={theme} onToggleTheme={toggleTheme} member={member} onLogin={goLogin} onSignup={goSignup} onLogout={logout} onMyPage={openMyPage} />}{(activeView === "login" || activeView === "signup") && <EnhancedAuthPage mode={activeView} theme={theme} onToggleTheme={toggleTheme} onHome={() => navigate("home")} onModeChange={(nextView) => navigate(nextView)} onToast={notify} onSuccess={(loggedIn) => { updateMember(loggedIn); notify("로그인되었습니다!"); navigate(authReturnView, true); }} />}{member && isMyPageOpen && <MyPageModal member={member} onClose={() => setIsMyPageOpen(false)} />}<footer className="footer"><strong>LOUNGE COMMUNITY</strong><span>좋아하는 주제로 모이고 이야기하는 공간</span><span>© LOUNGE. All rights reserved.</span></footer></div>;
 }
 
 export default EnhancedApp;
