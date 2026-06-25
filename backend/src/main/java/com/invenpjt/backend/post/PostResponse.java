@@ -8,6 +8,7 @@ public record PostResponse(
         String boardSlug,
         String title,
         String content,
+        Long authorId,
         String authorName,
         int viewCount,
         LocalDateTime createdAt,
@@ -21,6 +22,7 @@ public record PostResponse(
                 post.getBoard().getSlug(),
                 post.getTitle(),
                 post.getContent(),
+                post.getAuthor() == null ? null : post.getAuthor().getId(),
                 post.getAuthorName(),
                 post.getViewCount(),
                 post.getCreatedAt(),
@@ -28,4 +30,3 @@ public record PostResponse(
         );
     }
 }
-

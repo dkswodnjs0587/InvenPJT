@@ -10,8 +10,8 @@ public class HomeController {
     @GetMapping("/")
     public Map<String, String> home() {
         return Map.of(
-                "message", "InvenPJT backend is running.",
-                "frontend", "http://localhost:5173",
+                "message", "LOUNGE backend is running.",
+                "frontend", "http://localhost:5174",
                 "api", "http://localhost:8080/api/boards"
         );
     }

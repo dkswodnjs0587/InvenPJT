@@ -1,6 +1,7 @@
 package com.invenpjt.backend.post;
 
 import com.invenpjt.backend.board.Board;
+import com.invenpjt.backend.member.Member;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
 import jakarta.persistence.FetchType;
@@ -24,6 +25,10 @@ public class Post {
     @JoinColumn(name = "board_id")
     private Board board;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "author_member_id")
+    private Member author;
+
     @Column(nullable = false, length = 200)
     private String title;
 
@@ -44,11 +49,12 @@ public class Post {
     protected Post() {
     }
 
-    public Post(Board board, String title, String content, String authorName) {
+    public Post(Board board, Member author, String title, String content) {
         this.board = board;
+        this.author = author;
         this.title = title;
         this.content = content;
-        this.authorName = authorName;
+        this.authorName = author.getNickname();
     }
 
     public void update(String title, String content) {
@@ -61,36 +67,17 @@ public class Post {
         this.viewCount += 1;
     }
 
-    public Long getId() {
-        return id;
+    public boolean isWrittenBy(Long memberId) {
+        return author != null && author.getId().equals(memberId);
     }
 
-    public Board getBoard() {
-        return board;
-    }
-
-    public String getTitle() {
-        return title;
-    }
-
-    public String getContent() {
-        return content;
-    }
-
-    public String getAuthorName() {
-        return authorName;
-    }
-
-    public int getViewCount() {
-        return viewCount;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public LocalDateTime getUpdatedAt() {
-        return updatedAt;
-    }
+    public Long getId() { return id; }
+    public Board getBoard() { return board; }
+    public Member getAuthor() { return author; }
+    public String getTitle() { return title; }
+    public String getContent() { return content; }
+    public String getAuthorName() { return authorName; }
+    public int getViewCount() { return viewCount; }
+    public LocalDateTime getCreatedAt() { return createdAt; }
+    public LocalDateTime getUpdatedAt() { return updatedAt; }
 }
-
