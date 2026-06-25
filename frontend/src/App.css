@@ -1201,3 +1201,53 @@ html[data-theme="dark"] .dislikeButton.active {
     justify-content: flex-start;
   }
 }
+
+
+/* Fixed quick scroll buttons */
+.scrollQuickButtons {
+  position: fixed;
+  right: max(18px, calc((100vw - 1320px) / 2 - 64px));
+  bottom: 26px;
+  z-index: 1100;
+  display: grid;
+  gap: 8px;
+}
+
+.scrollQuickButtons button {
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  color: var(--text);
+  box-shadow: 0 12px 28px var(--shadow);
+  cursor: pointer;
+  font-size: 20px;
+  font-weight: 900;
+  backdrop-filter: blur(12px);
+  transition: transform .16s ease, border-color .16s ease, color .16s ease, background .16s ease;
+}
+
+.scrollQuickButtons button:hover {
+  border-color: #2563eb;
+  background: #2563eb;
+  color: white;
+  transform: translateY(-2px);
+}
+
+html[data-theme="dark"] .scrollQuickButtons button {
+  background: rgba(23, 32, 51, .86);
+}
+
+@media (max-width: 920px) {
+  .scrollQuickButtons {
+    right: 16px;
+    bottom: 18px;
+  }
+
+  .scrollQuickButtons button {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+  }
+}

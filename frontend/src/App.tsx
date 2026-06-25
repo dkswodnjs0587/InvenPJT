@@ -89,6 +89,13 @@ type ToastMessage = {
   text: string;
 };
 
+type RealtimeKeyword = {
+  id: number;
+  keyword: string;
+  searchCount: number;
+  updatedAt: string;
+};
+
 function formatBoardTime(createdAt: string) {
   const date = new Date(createdAt);
   if (Number.isNaN(date.getTime())) return "-";
@@ -912,7 +919,7 @@ const categories: Category[] = [
 ];
 
 const defaultRecentSearches = ["롤 패치노트", "메이플 이벤트", "피파 스쿼드", "농구 하이라이트"];
-const realtimeKeywords = ["롤 전적", "메이플 하이퍼버닝", "피파 신규 시즌", "축구 이적시장", "농구 플레이오프", "배드민턴 라켓", "라운지 이벤트", "게임 쿠폰", "자유 게시판", "오늘의 인기글"];
+const defaultRealtimeKeywords = ["롤 전적", "메이플 하이퍼버닝", "피파 신규 시즌", "축구 이적시장", "농구 플레이오프", "배드민턴 라켓", "라운지 이벤트", "게임 쿠폰", "자유 게시판", "오늘의 인기글"];
 
 
 
@@ -969,10 +976,24 @@ function Header({ onHome, theme, onToggleTheme, member, onLogin, onSignup, onLog
     localStorage.setItem("recentSearches", JSON.stringify(recentSearches));
   }, [recentSearches]);
 
-  const submitSearch = () => {
+  const submitSearch = async () => {
     const nextKeyword = keyword.trim();
     if (!nextKeyword) return;
     setRecentSearches((current) => [nextKeyword, ...current.filter((item) => item !== nextKeyword)].slice(0, 6));
+
+    try {
+      const response = await fetch("/api/search-keywords", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ keyword: nextKeyword }),
+      });
+      if (response.ok) {
+        window.dispatchEvent(new CustomEvent("searchKeywordRecorded", { detail: nextKeyword }));
+      }
+    } catch {
+      // 검색 저장 실패가 검색 UI 자체를 막지는 않도록 둡니다.
+    }
   };
 
   const hideRecent = () => {
@@ -986,12 +1007,36 @@ function Header({ onHome, theme, onToggleTheme, member, onLogin, onSignup, onLog
 
   const isLolHeader = variant === "lol";
 
-  return <header className={`header ${isLolHeader ? "lolHeader" : ""}`}><button className="logo logoButton" onClick={onHome}>{isLolHeader ? <><span className="brandLogo logoBox lolLogoMark">L</span><span className="logoText"><span>LOL LOUNGE</span><small>LEAGUE OF LEGENDS</small></span></> : <><img className="brandLogo" src="/brand/lounge-logo.png" alt="" /><span>LOUNGE</span><small>COMMUNITY</small></>}</button><div className="searchArea"><form className={`searchBox ${isSearchFocused ? "searchBoxFocused" : ""}`} onFocus={() => setIsSearchFocused(true)} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsSearchFocused(false); }} onSubmit={(event) => { event.preventDefault(); submitSearch(); }}>{isSearchFocused && <select className="searchScopeSelect" aria-label="검색 범위" value={searchScope} onChange={(event) => setSearchScope(event.target.value)}><option value="all">전체</option><option value="content">글 내용</option><option value="author">글쓴이</option></select>}<input type="search" aria-label="게시판 검색" placeholder={isSearchFocused ? "" : "게시판, 글, 유저를 검색해보세요"} value={keyword} onChange={(event) => setKeyword(event.target.value)} /><button aria-label="검색">⌕</button></form>{isSearchFocused && <section className={`recentSearches ${showRecentSearches ? "" : "recentSearchesFolded"}`} onMouseDown={(event) => event.preventDefault()}>{showRecentSearches ? <><div className="recentTitle"><b>최근 검색어</b><button onClick={() => setRecentSearches([])}>전체 삭제</button></div>{recentSearches.length > 0 ? <ul>{recentSearches.map((item) => <li key={item}><button className="recentKeyword" onClick={() => setKeyword(item)}>{item}</button><button className="recentDeleteButton" aria-label={`${item} 삭제`} onClick={() => removeRecent(item)}>×</button></li>)}</ul> : <p className="recentEmpty">최근 검색어가 없습니다.</p>}<button className="recentOffButton" onClick={hideRecent}>최근 검색어 보기 끄기</button></> : <div className="recentFolded"><span>최근 검색어 보기가 꺼져 있습니다.</span><button onClick={() => { setRecentSearches([]); setShowRecentSearches(true); localStorage.removeItem("hideRecentSearches"); }}>최근 검색어 보기</button></div>}</section>}</div><button className="menuToggle" type="button" aria-label="메뉴 열기" onClick={() => setIsMenuOpen((current) => !current)}>☰</button><div className={`userActions ${isMenuOpen ? "open" : ""}`}>{showHomeButton && <button className="homeIconBtn" type="button" aria-label="메인 라운지로 돌아가기" onClick={onMainHome ?? onHome}>⌂</button>}<button className="themeToggle" type="button" aria-label={theme === "dark" ? "라이트 모드로 변경" : "다크 모드로 변경"} onClick={onToggleTheme}>{theme === "dark" ? "☀" : "☾"}</button>{member ? <><span className="memberGreeting"><b>{member.nickname}</b>님</span><button className="myPageBtn" onClick={onMyPage}>마이페이지</button><button className="loginBtn" onClick={onLogout}>로그아웃</button></> : <><button className="loginBtn" onClick={onLogin}>로그인</button><button className="joinBtn" onClick={onSignup}>회원가입</button></>}</div></header>;
+  return <header className={`header ${isLolHeader ? "lolHeader" : ""}`}><button className="logo logoButton" onClick={onHome}>{isLolHeader ? <><span className="brandLogo logoBox lolLogoMark">L</span><span className="logoText"><span>LOL LOUNGE</span><small>LEAGUE OF LEGENDS</small></span></> : <><img className="brandLogo" src="/brand/lounge-logo.png" alt="" /><span>LOUNGE</span><small>COMMUNITY</small></>}</button><div className="searchArea"><form className={`searchBox ${isSearchFocused ? "searchBoxFocused" : ""}`} onFocus={() => setIsSearchFocused(true)} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsSearchFocused(false); }} onSubmit={(event) => { event.preventDefault(); submitSearch(); }}>{isSearchFocused && <select className="searchScopeSelect" aria-label="검색 범위" value={searchScope} onChange={(event) => setSearchScope(event.target.value)}><option value="all">전체</option><option value="content">글 내용</option><option value="author">글쓴이</option></select>}<input type="search" aria-label="게시판 검색" placeholder={isSearchFocused ? "" : "게시판, 글, 유저를 검색해보세요"} value={keyword} onChange={(event) => setKeyword(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); submitSearch(); } }} /><button aria-label="검색">⌕</button></form>{isSearchFocused && <section className={`recentSearches ${showRecentSearches ? "" : "recentSearchesFolded"}`} onMouseDown={(event) => event.preventDefault()}>{showRecentSearches ? <><div className="recentTitle"><b>최근 검색어</b><button onClick={() => setRecentSearches([])}>전체 삭제</button></div>{recentSearches.length > 0 ? <ul>{recentSearches.map((item) => <li key={item}><button className="recentKeyword" onClick={() => setKeyword(item)}>{item}</button><button className="recentDeleteButton" aria-label={`${item} 삭제`} onClick={() => removeRecent(item)}>×</button></li>)}</ul> : <p className="recentEmpty">최근 검색어가 없습니다.</p>}<button className="recentOffButton" onClick={hideRecent}>최근 검색어 보기 끄기</button></> : <div className="recentFolded"><span>최근 검색어 보기가 꺼져 있습니다.</span><button onClick={() => { setRecentSearches([]); setShowRecentSearches(true); localStorage.removeItem("hideRecentSearches"); }}>최근 검색어 보기</button></div>}</section>}</div><button className="menuToggle" type="button" aria-label="메뉴 열기" onClick={() => setIsMenuOpen((current) => !current)}>☰</button><div className={`userActions ${isMenuOpen ? "open" : ""}`}>{showHomeButton && <button className="homeIconBtn" type="button" aria-label="메인 라운지로 돌아가기" onClick={onMainHome ?? onHome}>⌂</button>}<button className="themeToggle" type="button" aria-label={theme === "dark" ? "라이트 모드로 변경" : "다크 모드로 변경"} onClick={onToggleTheme}>{theme === "dark" ? "☀" : "☾"}</button>{member ? <><span className="memberGreeting"><b>{member.nickname}</b>님</span><button className="myPageBtn" onClick={onMyPage}>마이페이지</button><button className="loginBtn" onClick={onLogout}>로그아웃</button></> : <><button className="loginBtn" onClick={onLogin}>로그인</button><button className="joinBtn" onClick={onSignup}>회원가입</button></>}</div></header>;
 }
 
 
 function Home({ onOpenFreeBoard, onOpenLounge, theme, onToggleTheme, member, onLogin, onSignup, onLogout, onMyPage = onLogin }: { onOpenFreeBoard: () => void; onOpenLounge: (category: Category) => void; theme: Theme; onToggleTheme: () => void; member: Member | null; onLogin: () => void; onSignup: () => void; onLogout: () => void; onMyPage?: () => void }) {
   const latestPosts = [...homepageHotPosts, ...homepageRecommendedPosts.slice(0, 2)].map((post) => ({ ...post, isNew: true }));
+  const [realtimeKeywords, setRealtimeKeywords] = useState<string[]>(defaultRealtimeKeywords);
+  const [isRealtimeLoading, setIsRealtimeLoading] = useState(true);
+
+  const loadRealtimeKeywords = () => {
+    setIsRealtimeLoading(true);
+    fetch("/api/search-keywords/realtime", { credentials: "include" })
+      .then(async (response) => {
+        if (!response.ok) throw new Error("실시간 검색어를 불러오지 못했습니다.");
+        return await response.json() as RealtimeKeyword[];
+      })
+      .then((items) => {
+        const keywords = items.map((item) => item.keyword).filter(Boolean);
+        setRealtimeKeywords(keywords.length > 0 ? keywords : defaultRealtimeKeywords);
+      })
+      .catch(() => setRealtimeKeywords(defaultRealtimeKeywords))
+      .finally(() => setIsRealtimeLoading(false));
+  };
+
+  useEffect(() => {
+    loadRealtimeKeywords();
+    const refreshRealtimeKeywords = () => loadRealtimeKeywords();
+    window.addEventListener("searchKeywordRecorded", refreshRealtimeKeywords);
+    return () => window.removeEventListener("searchKeywordRecorded", refreshRealtimeKeywords);
+  }, []);
 
   return (
     <>
@@ -1023,7 +1068,7 @@ function Home({ onOpenFreeBoard, onOpenLounge, theme, onToggleTheme, member, onL
             <div className="panelHeading">
               <div>
                 <h2>실시간 검색어</h2>
-                <p>지금 많이 찾는 키워드</p>
+                <p>{isRealtimeLoading ? "검색어 집계 중" : "지금 많이 찾는 키워드"}</p>
               </div>
             </div>
             <ol>
@@ -1292,6 +1337,18 @@ function MyPageModal({ member, onClose }: { member: Member; onClose: () => void 
   );
 }
 
+function ScrollQuickButtons() {
+  const scrollToTop = () => window.scrollTo({ top: 0, behavior: "smooth" });
+  const scrollToBottom = () => window.scrollTo({ top: document.documentElement.scrollHeight, behavior: "smooth" });
+
+  return (
+    <div className="scrollQuickButtons" aria-label="페이지 빠른 이동">
+      <button type="button" onClick={scrollToTop} aria-label="맨 위로 이동">↑</button>
+      <button type="button" onClick={scrollToBottom} aria-label="맨 아래로 이동">↓</button>
+    </div>
+  );
+}
+
 function EnhancedApp() {
   const [activeView, setActiveView] = useState<View>(readView);
   const [member, setMember] = useState<Member | null>(getCachedMember);
@@ -1411,7 +1468,7 @@ function EnhancedApp() {
   const isLolView = activeView === "lol";
   const header = <Header onHome={() => navigate(isLolView ? "lol" : "home")} theme={theme} onToggleTheme={toggleTheme} member={member} onLogin={goLogin} onSignup={goSignup} onLogout={logout} onMyPage={openMyPage} onMainHome={() => navigate("home")} variant={isLolView ? "lol" : "main"} showHomeButton={isLolView} />;
 
-  return <div className="app">{activeView === "lol" && <LolLounge header={header} />}{activeView === "free" && <FreeBoard onHome={() => navigate("home")} theme={theme} onToggleTheme={toggleTheme} member={member} onLogin={goLogin} onSignup={goSignup} onLogout={logout} onMyPage={openMyPage} onNotify={notify} />}{activeView === "home" && <Home onOpenFreeBoard={openFreeBoard} onOpenLounge={openLounge} theme={theme} onToggleTheme={toggleTheme} member={member} onLogin={goLogin} onSignup={goSignup} onLogout={logout} onMyPage={openMyPage} />}{(activeView === "login" || activeView === "signup") && <EnhancedAuthPage mode={activeView} theme={theme} onToggleTheme={toggleTheme} onHome={() => navigate("home")} onModeChange={(nextView) => navigate(nextView)} onToast={notify} onSuccess={(loggedIn) => { updateMember(loggedIn); notify("로그인되었습니다!"); navigate(authReturnView, true); }} />}{member && isMyPageOpen && <MyPageModal member={member} onClose={() => setIsMyPageOpen(false)} />}<footer className="footer"><strong>LOUNGE COMMUNITY</strong><span>좋아하는 주제로 모이고 이야기하는 공간</span><span>© LOUNGE. All rights reserved.</span></footer></div>;
+  return <div className="app">{activeView === "lol" && <LolLounge header={header} />}{activeView === "free" && <FreeBoard onHome={() => navigate("home")} theme={theme} onToggleTheme={toggleTheme} member={member} onLogin={goLogin} onSignup={goSignup} onLogout={logout} onMyPage={openMyPage} onNotify={notify} />}{activeView === "home" && <Home onOpenFreeBoard={openFreeBoard} onOpenLounge={openLounge} theme={theme} onToggleTheme={toggleTheme} member={member} onLogin={goLogin} onSignup={goSignup} onLogout={logout} onMyPage={openMyPage} />}{(activeView === "login" || activeView === "signup") && <EnhancedAuthPage mode={activeView} theme={theme} onToggleTheme={toggleTheme} onHome={() => navigate("home")} onModeChange={(nextView) => navigate(nextView)} onToast={notify} onSuccess={(loggedIn) => { updateMember(loggedIn); notify("로그인되었습니다!"); navigate(authReturnView, true); }} />}{member && isMyPageOpen && <MyPageModal member={member} onClose={() => setIsMyPageOpen(false)} />}<ScrollQuickButtons /><footer className="footer"><strong>LOUNGE COMMUNITY</strong><span>좋아하는 주제로 모이고 이야기하는 공간</span><span>© LOUNGE. All rights reserved.</span></footer></div>;
 }
 
 export default EnhancedApp;
