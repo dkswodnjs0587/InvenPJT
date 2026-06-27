@@ -4,6 +4,7 @@ import com.invenpjt.backend.board.Board;
 import com.invenpjt.backend.board.BoardRepository;
 import com.invenpjt.backend.member.Member;
 import com.invenpjt.backend.member.MemberRepository;
+import com.invenpjt.backend.notification.NotificationService;
 import java.util.List;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -22,6 +23,7 @@ public class PostService {
     private final PostCommentRepository postCommentRepository;
     private final CommentLikeRepository commentLikeRepository;
     private final CommentDislikeRepository commentDislikeRepository;
+    private final NotificationService notificationService;
 
     public PostService(
             BoardRepository boardRepository,
@@ -32,7 +34,8 @@ public class PostService {
             PostBookmarkRepository postBookmarkRepository,
             PostCommentRepository postCommentRepository,
             CommentLikeRepository commentLikeRepository,
-            CommentDislikeRepository commentDislikeRepository
+            CommentDislikeRepository commentDislikeRepository,
+            NotificationService notificationService
     ) {
         this.boardRepository = boardRepository;
         this.memberRepository = memberRepository;
@@ -43,6 +46,7 @@ public class PostService {
         this.postCommentRepository = postCommentRepository;
         this.commentLikeRepository = commentLikeRepository;
         this.commentDislikeRepository = commentDislikeRepository;
+        this.notificationService = notificationService;
     }
 
     @Transactional(readOnly = true)
@@ -124,6 +128,7 @@ public class PostService {
                 .ifPresentOrElse(postLikeRepository::delete, () -> {
                     postDislikeRepository.findByPostAndMember(post, member).ifPresent(postDislikeRepository::delete);
                     postLikeRepository.save(new PostLike(post, member));
+                    notificationService.notifyPostLike(post.getAuthor(), member.getNickname(), post.getTitle(), post.getId());
                 });
         return toPostResponse(post, member);
     }
@@ -167,7 +172,12 @@ public class PostService {
         Post post = getPostById(postId);
         Member author = getMemberById(memberId);
         PostComment comment = new PostComment(post, author, request.content().trim());
-        return toCommentResponse(postCommentRepository.save(comment), author);
+        PostComment savedComment = postCommentRepository.save(comment);
+        Member postAuthor = post.getAuthor();
+        if (postAuthor != null && !postAuthor.getId().equals(author.getId())) {
+            notificationService.notifyComment(postAuthor, author.getNickname(), post.getTitle(), post.getId());
+        }
+        return toCommentResponse(savedComment, author);
     }
 
     @Transactional

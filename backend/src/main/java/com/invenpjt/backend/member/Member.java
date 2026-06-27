@@ -31,6 +31,12 @@ public class Member {
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
+    @Column(nullable = false, columnDefinition = "boolean default true")
+    private boolean notifyComment = true;
+
+    @Column(nullable = false, columnDefinition = "boolean default true")
+    private boolean notifyReaction = true;
+
     protected Member() {
     }
 
@@ -42,9 +48,16 @@ public class Member {
         this.createdAt = LocalDateTime.now();
     }
 
+    public void updateNotificationSettings(boolean notifyComment, boolean notifyReaction) {
+        this.notifyComment = notifyComment;
+        this.notifyReaction = notifyReaction;
+    }
+
     public Long getId() { return id; }
     public String getUsername() { return username; }
     public String getNickname() { return nickname; }
     public String getEmail() { return email; }
     public String getPasswordHash() { return passwordHash; }
+    public boolean isNotifyComment() { return notifyComment; }
+    public boolean isNotifyReaction() { return notifyReaction; }
 }

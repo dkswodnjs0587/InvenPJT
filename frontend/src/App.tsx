@@ -96,6 +96,21 @@ type RealtimeKeyword = {
   updatedAt: string;
 };
 
+type NotificationItem = {
+  id: number;
+  type: "COMMENT" | "POST_LIKE" | string;
+  actorName: string;
+  message: string;
+  postId: number | null;
+  read: boolean;
+  createdAt: string;
+};
+
+type NotificationSettings = {
+  notifyComment: boolean;
+  notifyReaction: boolean;
+};
+
 function formatBoardTime(createdAt: string) {
   const date = new Date(createdAt);
   if (Number.isNaN(date.getTime())) return "-";
@@ -110,6 +125,25 @@ function formatBoardTime(createdAt: string) {
   }
   if (dayDiff === 1) return "어제";
   return date.toLocaleDateString("ko-KR");
+}
+
+function renderPostContent(content: string): ReactNode[] {
+  const nodes: ReactNode[] = [];
+  const imageRegex = /!\[[^\]]*\]\(([^)]+)\)/g;
+  let lastIndex = 0;
+  let key = 0;
+  let match: RegExpExecArray | null;
+  while ((match = imageRegex.exec(content)) !== null) {
+    if (match.index > lastIndex) {
+      nodes.push(<span key={key++}>{content.slice(lastIndex, match.index)}</span>);
+    }
+    nodes.push(<img key={key++} className="postImage" src={match[1]} alt="첨부 이미지" loading="lazy" />);
+    lastIndex = imageRegex.lastIndex;
+  }
+  if (lastIndex < content.length) {
+    nodes.push(<span key={key++}>{content.slice(lastIndex)}</span>);
+  }
+  return nodes;
 }
 
 function readBoardRoute(): BoardRoute {
@@ -147,6 +181,17 @@ function FreeBoard({ onHome, theme, onToggleTheme, member, onLogin, onSignup, on
   const [writeError, setWriteError] = useState("");
   const [editError, setEditError] = useState("");
   const [commentError, setCommentError] = useState("");
+  const [commentSort, setCommentSort] = useState<"oldest" | "latest">("oldest");
+  const [isUploadingImage, setIsUploadingImage] = useState(false);
+
+  const sortedComments = useMemo(() => {
+    const next = [...comments];
+    next.sort((a, b) => {
+      const diff = new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime();
+      return commentSort === "latest" ? -diff : diff;
+    });
+    return next;
+  }, [comments, commentSort]);
 
   const sortedPosts = useMemo(() => {
     const nextPosts = [...posts];
@@ -243,10 +288,32 @@ function FreeBoard({ onHome, theme, onToggleTheme, member, onLogin, onSignup, on
 
   const openWriteForm = () => {
     if (!member) {
+      onNotify("로그인이 필요합니다. 먼저 로그인해 주세요.");
       onLogin();
       return;
     }
     navigateBoard({ mode: "write" });
+  };
+
+  const handleImageUpload = async (files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    setIsUploadingImage(true);
+    setWriteError("");
+    try {
+      for (const file of Array.from(files)) {
+        const formData = new FormData();
+        formData.append("file", file);
+        const response = await fetch("/api/uploads/image", { method: "POST", credentials: "include", body: formData });
+        if (!response.ok) throw new Error(await readError(response));
+        const { url } = await response.json() as { url: string };
+        setWriteContent((current) => `${current}${current && !current.endsWith("\n") ? "\n" : ""}![이미지](${url})\n`);
+      }
+      onNotify("사진을 추가했습니다.");
+    } catch (caughtError) {
+      setWriteError(caughtError instanceof Error ? caughtError.message : "사진 업로드에 실패했습니다.");
+    } finally {
+      setIsUploadingImage(false);
+    }
   };
 
   const openPostDetail = (postId: number) => {
@@ -604,6 +671,14 @@ function FreeBoard({ onHome, theme, onToggleTheme, member, onLogin, onSignup, on
                   />
                 </label>
 
+                <div className="imageUploadRow">
+                  <label className="imageUploadButton">
+                    <input type="file" accept="image/*" multiple onChange={(event) => { handleImageUpload(event.target.files); event.target.value = ""; }} disabled={isUploadingImage} />
+                    <span aria-hidden="true">🖼</span> {isUploadingImage ? "업로드 중..." : "사진 추가"}
+                  </label>
+                  <span className="imageUploadHint">이미지를 선택하면 본문에 자동으로 삽입됩니다.</span>
+                </div>
+
                 {writeError && <p className="authError" style={{ margin: 0 }}>{writeError}</p>}
               </form>
             </section>
@@ -707,19 +782,23 @@ function FreeBoard({ onHome, theme, onToggleTheme, member, onLogin, onSignup, on
                   </div>
                 </div>
 
-                <div className="postDetailContent">{selectedPost.content}</div>
+                <div className="postDetailContent">{renderPostContent(selectedPost.content)}</div>
 
                 <section className="commentSection">
                   <div className="commentHeader">
                     <h3>댓글 <strong>{comments.length}</strong></h3>
-                    {isCommentLoading && <span>불러오는 중...</span>}
+                    <div className="commentSortGroup">
+                      {isCommentLoading && <span>불러오는 중...</span>}
+                      <button type="button" className={commentSort === "oldest" ? "sortSelected" : ""} onClick={() => setCommentSort("oldest")}>등록순</button>
+                      <button type="button" className={commentSort === "latest" ? "sortSelected" : ""} onClick={() => setCommentSort("latest")}>최신순</button>
+                    </div>
                   </div>
 
                   {commentError && <p className="authError commentError">{commentError}</p>}
 
                   <div className="commentList">
                     {!isCommentLoading && comments.length === 0 && <p className="emptyComment">아직 댓글이 없습니다. 첫 댓글을 남겨보세요.</p>}
-                    {comments.map((comment) => (
+                    {sortedComments.map((comment) => (
                       <article className="commentItem" key={comment.id}>
                         <div>
                           <b>{comment.authorName}</b>
@@ -762,6 +841,7 @@ function FreeBoard({ onHome, theme, onToggleTheme, member, onLogin, onSignup, on
                   <button type="button" className={sortMode === "latest" ? "sortSelected" : ""} onClick={() => setSortMode("latest")}>최신순</button>
                   <button type="button" className={sortMode === "likes" ? "sortSelected" : ""} onClick={() => setSortMode("likes")}>추천순</button>
                   <button type="button" className={sortMode === "views" ? "sortSelected" : ""} onClick={() => setSortMode("views")}>조회순</button>
+                  <button type="button" className={`refreshButton ${isLoading ? "refreshing" : ""}`} onClick={loadPosts} disabled={isLoading} title="목록 새로고침" aria-label="목록 새로고침"><span className="refreshIcon" aria-hidden="true">↻</span> 새로고침</button>
                 </div>
               </div>
 
@@ -952,6 +1032,115 @@ function PostBadges({ isHot, isNew }: { isHot?: boolean; isNew?: boolean }) {
   return <span className="badgeGroup">{isHot && <span className="hotBadge">H</span>}{isNew && <span className="newBadge">N</span>}</span>;
 }
 
+function formatNotificationTime(createdAt: string) {
+  const date = new Date(createdAt);
+  if (Number.isNaN(date.getTime())) return "";
+  const diffMs = Date.now() - date.getTime();
+  const diffMin = Math.floor(diffMs / 60000);
+  if (diffMin < 1) return "방금 전";
+  if (diffMin < 60) return `${diffMin}분 전`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${diffHour}시간 전`;
+  const diffDay = Math.floor(diffHour / 24);
+  if (diffDay < 7) return `${diffDay}일 전`;
+  return date.toLocaleDateString("ko-KR");
+}
+
+function NotificationBell({ member }: { member: Member }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const [items, setItems] = useState<NotificationItem[]>([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const loadUnreadCount = () => {
+    fetch("/api/notifications/unread-count", { credentials: "include" })
+      .then((response) => response.ok ? response.json() as Promise<{ count: number }> : { count: 0 })
+      .then((data) => setUnreadCount(data.count ?? 0))
+      .catch(() => undefined);
+  };
+
+  const loadNotifications = () => {
+    setIsLoading(true);
+    fetch("/api/notifications", { credentials: "include" })
+      .then((response) => response.ok ? response.json() as Promise<NotificationItem[]> : [])
+      .then((data) => setItems(Array.isArray(data) ? data : []))
+      .catch(() => setItems([]))
+      .finally(() => setIsLoading(false));
+  };
+
+  useEffect(() => {
+    loadUnreadCount();
+    const timer = window.setInterval(loadUnreadCount, 30000);
+    return () => window.clearInterval(timer);
+  }, [member.id]);
+
+  const toggleOpen = () => {
+    setIsOpen((current) => {
+      const next = !current;
+      if (next) loadNotifications();
+      return next;
+    });
+  };
+
+  const goToPost = (item: NotificationItem) => {
+    fetch(`/api/notifications/${item.id}/read`, { method: "POST", credentials: "include" }).catch(() => undefined);
+    setItems((current) => current.map((entry) => entry.id === item.id ? { ...entry, read: true } : entry));
+    setUnreadCount((current) => item.read ? current : Math.max(0, current - 1));
+    setIsOpen(false);
+    if (item.postId) {
+      const url = new URL(window.location.href);
+      url.search = "";
+      url.searchParams.set("board", "free");
+      url.searchParams.set("post", String(item.postId));
+      window.history.pushState({ view: "free", boardRoute: { mode: "detail", postId: item.postId } }, "", url);
+      window.dispatchEvent(new PopStateEvent("popstate"));
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+  };
+
+  const markAllRead = () => {
+    fetch("/api/notifications/read-all", { method: "POST", credentials: "include" }).catch(() => undefined);
+    setItems((current) => current.map((entry) => ({ ...entry, read: true })));
+    setUnreadCount(0);
+  };
+
+  return (
+    <div className="notificationBell" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsOpen(false); }}>
+      <button type="button" className="notificationToggle" aria-label="알림" onClick={toggleOpen}>
+        <span aria-hidden="true">🔔</span>
+        {unreadCount > 0 && <span className="notificationBadge">{unreadCount > 99 ? "99+" : unreadCount}</span>}
+      </button>
+      {isOpen && (
+        <section className="notificationPanel" onMouseDown={(event) => event.preventDefault()}>
+          <div className="notificationPanelHead">
+            <b>알림</b>
+            <button type="button" onClick={markAllRead} disabled={items.every((entry) => entry.read)}>모두 읽음</button>
+          </div>
+          <div className="notificationList">
+            {isLoading && <p className="notificationEmpty">불러오는 중...</p>}
+            {!isLoading && items.length === 0 && <p className="notificationEmpty">받은 알림이 없습니다.</p>}
+            {!isLoading && items.map((item) => (
+              <button
+                type="button"
+                key={item.id}
+                className={`notificationItem ${item.read ? "" : "unread"}`}
+                onClick={() => goToPost(item)}
+              >
+                <span className="notificationIcon" aria-hidden="true">{item.type === "POST_LIKE" ? "👍" : "💬"}</span>
+                <span className="notificationBody">
+                  <span className="notificationText">{item.message}</span>
+                  <small>{formatNotificationTime(item.createdAt)}</small>
+                </span>
+                {!item.read && <span className="notificationDot" aria-hidden="true" />}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
+    </div>
+  );
+}
+
 function Header({ onHome, theme, onToggleTheme, member, onLogin, onSignup, onLogout, onMyPage = onHome, variant = "main", showHomeButton = false, onMainHome }: { onHome: () => void; theme: Theme; onToggleTheme: () => void; member: Member | null; onLogin: () => void; onSignup: () => void; onLogout: () => void; onMyPage?: () => void; variant?: "main" | "lol"; showHomeButton?: boolean; onMainHome?: () => void }) {
   const [keyword, setKeyword] = useState("");
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -1007,7 +1196,7 @@ function Header({ onHome, theme, onToggleTheme, member, onLogin, onSignup, onLog
 
   const isLolHeader = variant === "lol";
 
-  return <header className={`header ${isLolHeader ? "lolHeader" : ""}`}><button className="logo logoButton" onClick={onHome}>{isLolHeader ? <><span className="brandLogo logoBox lolLogoMark">L</span><span className="logoText"><span>LOL LOUNGE</span><small>LEAGUE OF LEGENDS</small></span></> : <><img className="brandLogo" src="/brand/lounge-logo.png" alt="" /><span>LOUNGE</span><small>COMMUNITY</small></>}</button><div className="searchArea"><form className={`searchBox ${isSearchFocused ? "searchBoxFocused" : ""}`} onFocus={() => setIsSearchFocused(true)} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsSearchFocused(false); }} onSubmit={(event) => { event.preventDefault(); submitSearch(); }}>{isSearchFocused && <select className="searchScopeSelect" aria-label="검색 범위" value={searchScope} onChange={(event) => setSearchScope(event.target.value)}><option value="all">전체</option><option value="content">글 내용</option><option value="author">글쓴이</option></select>}<input type="search" aria-label="게시판 검색" placeholder={isSearchFocused ? "" : "게시판, 글, 유저를 검색해보세요"} value={keyword} onChange={(event) => setKeyword(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); submitSearch(); } }} /><button aria-label="검색">⌕</button></form>{isSearchFocused && <section className={`recentSearches ${showRecentSearches ? "" : "recentSearchesFolded"}`} onMouseDown={(event) => event.preventDefault()}>{showRecentSearches ? <><div className="recentTitle"><b>최근 검색어</b><button onClick={() => setRecentSearches([])}>전체 삭제</button></div>{recentSearches.length > 0 ? <ul>{recentSearches.map((item) => <li key={item}><button className="recentKeyword" onClick={() => setKeyword(item)}>{item}</button><button className="recentDeleteButton" aria-label={`${item} 삭제`} onClick={() => removeRecent(item)}>×</button></li>)}</ul> : <p className="recentEmpty">최근 검색어가 없습니다.</p>}<button className="recentOffButton" onClick={hideRecent}>최근 검색어 보기 끄기</button></> : <div className="recentFolded"><span>최근 검색어 보기가 꺼져 있습니다.</span><button onClick={() => { setRecentSearches([]); setShowRecentSearches(true); localStorage.removeItem("hideRecentSearches"); }}>최근 검색어 보기</button></div>}</section>}</div><button className="menuToggle" type="button" aria-label="메뉴 열기" onClick={() => setIsMenuOpen((current) => !current)}>☰</button><div className={`userActions ${isMenuOpen ? "open" : ""}`}>{showHomeButton && <button className="homeIconBtn" type="button" aria-label="메인 라운지로 돌아가기" onClick={onMainHome ?? onHome}>⌂</button>}<button className="themeToggle" type="button" aria-label={theme === "dark" ? "라이트 모드로 변경" : "다크 모드로 변경"} onClick={onToggleTheme}>{theme === "dark" ? "☀" : "☾"}</button>{member ? <><span className="memberGreeting"><b>{member.nickname}</b>님</span><button className="myPageBtn" onClick={onMyPage}>마이페이지</button><button className="loginBtn" onClick={onLogout}>로그아웃</button></> : <><button className="loginBtn" onClick={onLogin}>로그인</button><button className="joinBtn" onClick={onSignup}>회원가입</button></>}</div></header>;
+  return <header className={`header ${isLolHeader ? "lolHeader" : ""}`}><button className="logo logoButton" onClick={onHome}>{isLolHeader ? <><span className="brandLogo logoBox lolLogoMark">L</span><span className="logoText"><span>LOL LOUNGE</span><small>LEAGUE OF LEGENDS</small></span></> : <><img className="brandLogo" src="/brand/lounge-logo.png" alt="" /><span>LOUNGE</span><small>COMMUNITY</small></>}</button><div className="searchArea"><form className={`searchBox ${isSearchFocused ? "searchBoxFocused" : ""}`} onFocus={() => setIsSearchFocused(true)} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsSearchFocused(false); }} onSubmit={(event) => { event.preventDefault(); submitSearch(); }}>{isSearchFocused && <select className="searchScopeSelect" aria-label="검색 범위" value={searchScope} onChange={(event) => setSearchScope(event.target.value)}><option value="all">전체</option><option value="content">글 내용</option><option value="author">글쓴이</option></select>}<input type="search" aria-label="게시판 검색" placeholder={isSearchFocused ? "" : "게시판, 글, 유저를 검색해보세요"} value={keyword} onChange={(event) => setKeyword(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); submitSearch(); } }} /><button aria-label="검색">⌕</button></form>{isSearchFocused && <section className={`recentSearches ${showRecentSearches ? "" : "recentSearchesFolded"}`} onMouseDown={(event) => event.preventDefault()}>{showRecentSearches ? <><div className="recentTitle"><b>최근 검색어</b><button onClick={() => setRecentSearches([])}>전체 삭제</button></div>{recentSearches.length > 0 ? <ul>{recentSearches.map((item) => <li key={item}><button className="recentKeyword" onClick={() => setKeyword(item)}>{item}</button><button className="recentDeleteButton" aria-label={`${item} 삭제`} onClick={() => removeRecent(item)}>×</button></li>)}</ul> : <p className="recentEmpty">최근 검색어가 없습니다.</p>}<button className="recentOffButton" onClick={hideRecent}>최근 검색어 보기 끄기</button></> : <div className="recentFolded"><span>최근 검색어 보기가 꺼져 있습니다.</span><button onClick={() => { setRecentSearches([]); setShowRecentSearches(true); localStorage.removeItem("hideRecentSearches"); }}>최근 검색어 보기</button></div>}</section>}</div><button className="menuToggle" type="button" aria-label="메뉴 열기" onClick={() => setIsMenuOpen((current) => !current)}>☰</button><div className={`userActions ${isMenuOpen ? "open" : ""}`}>{showHomeButton && <button className="homeIconBtn" type="button" aria-label="메인 라운지로 돌아가기" onClick={onMainHome ?? onHome}>⌂</button>}<button className="themeToggle" type="button" aria-label={theme === "dark" ? "라이트 모드로 변경" : "다크 모드로 변경"} onClick={onToggleTheme}>{theme === "dark" ? "☀" : "☾"}</button>{member && <NotificationBell member={member} />}{member ? <><span className="memberGreeting"><b>{member.nickname}</b>님</span><button className="myPageBtn" onClick={onMyPage}>마이페이지</button><button className="loginBtn" onClick={onLogout}>로그아웃</button></> : <><button className="loginBtn" onClick={onLogin}>로그인</button><button className="joinBtn" onClick={onSignup}>회원가입</button></>}</div></header>;
 }
 
 
@@ -1222,7 +1411,7 @@ function EnhancedAuthPage({ mode, theme, onToggleTheme, onHome, onModeChange, on
       if (!response.ok) throw new Error(await readError(response));
       const loggedIn = await response.json() as Member;
       if (isSignup) {
-        onToast("회원가입이 성공적으로 되었습니다.");
+        onToast("회원가입이 되었습니다.");
         onModeChange("login");
         return;
       }
@@ -1272,6 +1461,9 @@ function MyPageModal({ member, onClose }: { member: Member; onClose: () => void 
   const [saved, setSaved] = useState(false);
   const [activity, setActivity] = useState<MyPageActivity | null>(null);
   const [activityError, setActivityError] = useState("");
+  const [notifyComment, setNotifyComment] = useState(true);
+  const [notifyReaction, setNotifyReaction] = useState(true);
+  const [isSavingSettings, setIsSavingSettings] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -1286,6 +1478,39 @@ function MyPageModal({ member, onClose }: { member: Member; onClose: () => void 
       });
     return () => { active = false; };
   }, []);
+
+  useEffect(() => {
+    let active = true;
+    fetch("/api/notifications/settings", { credentials: "include" })
+      .then((response) => response.ok ? response.json() as Promise<NotificationSettings> : null)
+      .then((settings) => {
+        if (active && settings) {
+          setNotifyComment(settings.notifyComment);
+          setNotifyReaction(settings.notifyReaction);
+        }
+      })
+      .catch(() => undefined);
+    return () => { active = false; };
+  }, []);
+
+  const saveSettings = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setIsSavingSettings(true);
+    setSaved(false);
+    try {
+      const response = await fetch("/api/notifications/settings", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ notifyComment, notifyReaction }),
+      });
+      if (response.ok) setSaved(true);
+    } catch {
+      // 저장 실패는 조용히 무시하고 사용자가 다시 시도하도록 둡니다.
+    } finally {
+      setIsSavingSettings(false);
+    }
+  };
 
   const renderPostList = (posts: BoardPost[], emptyText: string) => (
     <ul className="myPostMiniList">
@@ -1317,11 +1542,11 @@ function MyPageModal({ member, onClose }: { member: Member; onClose: () => void 
           </section>
           <section className="mySettingsCard">
             <div className="panelHeading"><div><h2>개인 설정</h2><p>라운지 이용 환경을 설정하세요</p></div></div>
-            <form onSubmit={(event) => { event.preventDefault(); setSaved(true); }}>
+            <form onSubmit={saveSettings}>
               <label>선호 테마<select defaultValue="시스템 설정"><option>시스템 설정</option><option>라이트 모드</option><option>다크 모드</option></select></label>
-              <label className="checkLabel"><input type="checkbox" defaultChecked /> 댓글 알림 받기</label>
-              <label className="checkLabel"><input type="checkbox" defaultChecked /> 내 글 반응 알림 받기</label>
-              <button className="authSubmit">설정 저장</button>
+              <label className="checkLabel"><input type="checkbox" checked={notifyComment} onChange={(event) => { setNotifyComment(event.target.checked); setSaved(false); }} /> 댓글 알림 받기</label>
+              <label className="checkLabel"><input type="checkbox" checked={notifyReaction} onChange={(event) => { setNotifyReaction(event.target.checked); setSaved(false); }} /> 내 글 반응(추천) 알림 받기</label>
+              <button className="authSubmit" disabled={isSavingSettings}>{isSavingSettings ? "저장 중..." : "설정 저장"}</button>
               {saved && <p className="settingsSaved">설정이 저장되었습니다.</p>}
             </form>
           </section>
@@ -1468,7 +1693,7 @@ function EnhancedApp() {
   const isLolView = activeView === "lol";
   const header = <Header onHome={() => navigate(isLolView ? "lol" : "home")} theme={theme} onToggleTheme={toggleTheme} member={member} onLogin={goLogin} onSignup={goSignup} onLogout={logout} onMyPage={openMyPage} onMainHome={() => navigate("home")} variant={isLolView ? "lol" : "main"} showHomeButton={isLolView} />;
 
-  return <div className="app">{activeView === "lol" && <LolLounge header={header} />}{activeView === "free" && <FreeBoard onHome={() => navigate("home")} theme={theme} onToggleTheme={toggleTheme} member={member} onLogin={goLogin} onSignup={goSignup} onLogout={logout} onMyPage={openMyPage} onNotify={notify} />}{activeView === "home" && <Home onOpenFreeBoard={openFreeBoard} onOpenLounge={openLounge} theme={theme} onToggleTheme={toggleTheme} member={member} onLogin={goLogin} onSignup={goSignup} onLogout={logout} onMyPage={openMyPage} />}{(activeView === "login" || activeView === "signup") && <EnhancedAuthPage mode={activeView} theme={theme} onToggleTheme={toggleTheme} onHome={() => navigate("home")} onModeChange={(nextView) => navigate(nextView)} onToast={notify} onSuccess={(loggedIn) => { updateMember(loggedIn); notify("로그인되었습니다!"); navigate(authReturnView, true); }} />}{member && isMyPageOpen && <MyPageModal member={member} onClose={() => setIsMyPageOpen(false)} />}<ScrollQuickButtons /><footer className="footer"><strong>LOUNGE COMMUNITY</strong><span>좋아하는 주제로 모이고 이야기하는 공간</span><span>© LOUNGE. All rights reserved.</span></footer></div>;
+  return <div className="app">{activeView === "lol" && <LolLounge header={header} />}{activeView === "free" && <FreeBoard onHome={() => navigate("home")} theme={theme} onToggleTheme={toggleTheme} member={member} onLogin={goLogin} onSignup={goSignup} onLogout={logout} onMyPage={openMyPage} onNotify={notify} />}{activeView === "home" && <Home onOpenFreeBoard={openFreeBoard} onOpenLounge={openLounge} theme={theme} onToggleTheme={toggleTheme} member={member} onLogin={goLogin} onSignup={goSignup} onLogout={logout} onMyPage={openMyPage} />}{(activeView === "login" || activeView === "signup") && <EnhancedAuthPage mode={activeView} theme={theme} onToggleTheme={toggleTheme} onHome={() => navigate("home")} onModeChange={(nextView) => navigate(nextView)} onToast={notify} onSuccess={(loggedIn) => { updateMember(loggedIn); notify("로그인 되었습니다."); navigate(authReturnView, true); }} />}{member && isMyPageOpen && <MyPageModal member={member} onClose={() => setIsMyPageOpen(false)} />}{toast && <div className="toastMessage" role="status">{toast.text}</div>}<ScrollQuickButtons /><footer className="footer"><strong>LOUNGE COMMUNITY</strong><span>좋아하는 주제로 모이고 이야기하는 공간</span><span>© LOUNGE. All rights reserved.</span></footer></div>;
 }
 
 export default EnhancedApp;

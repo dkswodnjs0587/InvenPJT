@@ -36,3 +36,6 @@ yarn-error.log*
 
 # Logs
 *.log
+
+# uploaded images
+backend/uploads/
