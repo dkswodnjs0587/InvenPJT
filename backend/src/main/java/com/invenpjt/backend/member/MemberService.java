@@ -48,6 +48,19 @@ public class MemberService {
         return MemberResponse.from(member);
     }
 
+    @Transactional(readOnly = true)
+    public void verifyPasswordResetTarget(String username, String email) {
+        Member member = memberRepository.findByUsername(username.trim())
+                .orElseThrow(this::passwordResetMismatch);
+        if (!member.getEmail().equalsIgnoreCase(email.trim())) {
+            throw passwordResetMismatch();
+        }
+    }
+
+    private ResponseStatusException passwordResetMismatch() {
+        return new ResponseStatusException(HttpStatus.NOT_FOUND, "입력하신 아이디와 이메일이 일치하는 계정이 없습니다.");
+    }
+
     public MemberResponse findById(Long id) {
         Member member = memberRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "로그인이 필요합니다."));

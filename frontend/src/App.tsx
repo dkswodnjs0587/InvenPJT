@@ -1,4 +1,4 @@
-﻿import { useEffect, useMemo, useState } from "react";
+﻿import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties, FormEvent, ReactNode } from "react";
 import "./App.css";
 
@@ -183,6 +183,8 @@ function FreeBoard({ onHome, theme, onToggleTheme, member, onLogin, onSignup, on
   const [commentError, setCommentError] = useState("");
   const [commentSort, setCommentSort] = useState<"oldest" | "latest">("oldest");
   const [isUploadingImage, setIsUploadingImage] = useState(false);
+  const [searchQuery, setSearchQuery] = useState(() => new URLSearchParams(window.location.search).get("q") ?? "");
+  const [searchScope, setSearchScope] = useState(() => new URLSearchParams(window.location.search).get("scope") ?? "all");
 
   const sortedComments = useMemo(() => {
     const next = [...comments];
@@ -205,9 +207,31 @@ function FreeBoard({ onHome, theme, onToggleTheme, member, onLogin, onSignup, on
     return nextPosts;
   }, [posts, sortMode]);
 
-  const totalPages = Math.max(1, Math.ceil(sortedPosts.length / pageSize));
+  const filteredPosts = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return sortedPosts;
+    return sortedPosts.filter((post) => {
+      const inTitle = post.title.toLowerCase().includes(query);
+      const inContent = post.content.toLowerCase().includes(query);
+      const inAuthor = post.authorName.toLowerCase().includes(query);
+      if (searchScope === "author") return inAuthor;
+      if (searchScope === "content") return inTitle || inContent;
+      return inTitle || inContent || inAuthor;
+    });
+  }, [sortedPosts, searchQuery, searchScope]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredPosts.length / pageSize));
   const safeCurrentPage = Math.min(currentPage, totalPages);
-  const visiblePosts = sortedPosts.slice((safeCurrentPage - 1) * pageSize, safeCurrentPage * pageSize);
+  const visiblePosts = filteredPosts.slice((safeCurrentPage - 1) * pageSize, safeCurrentPage * pageSize);
+
+  const clearSearch = () => {
+    setSearchQuery("");
+    setSearchScope("all");
+    const url = new URL(window.location.href);
+    url.search = "";
+    url.searchParams.set("board", "free");
+    window.history.pushState({ view: "free" }, "", url);
+  };
 
   const formatDate = formatBoardTime;
 
@@ -555,6 +579,9 @@ function FreeBoard({ onHome, theme, onToggleTheme, member, onLogin, onSignup, on
   useEffect(() => {
     const onPopState = () => {
       setBoardRoute(readBoardRoute());
+      const params = new URLSearchParams(window.location.search);
+      setSearchQuery(params.get("q") ?? "");
+      setSearchScope(params.get("scope") ?? "all");
       window.scrollTo(0, 0);
     };
     window.addEventListener("popstate", onPopState);
@@ -594,7 +621,7 @@ function FreeBoard({ onHome, theme, onToggleTheme, member, onLogin, onSignup, on
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [pageSize, sortMode]);
+  }, [pageSize, sortMode, searchQuery, searchScope]);
 
   useEffect(() => {
     if (currentPage > totalPages) setCurrentPage(totalPages);
@@ -828,8 +855,19 @@ function FreeBoard({ onHome, theme, onToggleTheme, member, onLogin, onSignup, on
         ) : (
           <div className="boardLayout boardLayoutWide">
             <section className="boardTable">
+              {searchQuery && (
+                <div className="searchResultBar">
+                  <span className="searchResultText">
+                    <span className="searchResultIcon" aria-hidden="true">⌕</span>
+                    <b>'{searchQuery}'</b>
+                    <small>{searchScope === "author" ? "글쓴이" : searchScope === "content" ? "글 내용" : "전체"} 검색 결과</small>
+                    <strong>{filteredPosts.length}</strong>건
+                  </span>
+                  <button type="button" className="searchClearButton" onClick={clearSearch}>✕ 검색 해제</button>
+                </div>
+              )}
               <div className="tableTools boardTableTools">
-                <b>전체 글 <strong>{posts.length}</strong></b>
+                <b>전체 글 <strong>{searchQuery ? filteredPosts.length : posts.length}</strong></b>
                 <div className="boardListControls">
                   <label>
                     보기
@@ -877,10 +915,10 @@ function FreeBoard({ onHome, theme, onToggleTheme, member, onLogin, onSignup, on
                 </article>
               )}
 
-              {!isLoading && !error && posts.length === 0 && (
+              {!isLoading && !error && filteredPosts.length === 0 && (
                 <article className="postRow emptyRow">
                   <span>-</span>
-                  <span>아직 등록된 게시글이 없습니다.</span>
+                  <span>{searchQuery ? `'${searchQuery}'에 대한 검색 결과가 없습니다.` : "아직 등록된 게시글이 없습니다."}</span>
                   <span>-</span>
                   <span>-</span>
                   <span>-</span>
@@ -956,9 +994,15 @@ function readView(): View {
   return view === "login" || view === "signup" || view === "lol" ? view : "home";
 }
 
+function clearCachedMember() {
+  localStorage.removeItem(MEMBER_CACHE_KEY);
+  sessionStorage.removeItem(MEMBER_CACHE_KEY);
+}
+
 function getCachedMember(): Member | null {
   try {
-    const saved = localStorage.getItem(MEMBER_CACHE_KEY);
+    // "로그인 유지"를 끄면 sessionStorage에만 저장되어 브라우저를 닫으면 사라진다.
+    const saved = sessionStorage.getItem(MEMBER_CACHE_KEY) ?? localStorage.getItem(MEMBER_CACHE_KEY);
     if (!saved) return null;
     const parsed: unknown = JSON.parse(saved);
     if (
@@ -968,12 +1012,12 @@ function getCachedMember(): Member | null {
       typeof (parsed as Member).nickname !== "string" ||
       typeof (parsed as Member).email !== "string"
     ) {
-      localStorage.removeItem(MEMBER_CACHE_KEY);
+      clearCachedMember();
       return null;
     }
     return parsed as Member;
   } catch {
-    localStorage.removeItem(MEMBER_CACHE_KEY);
+    clearCachedMember();
     return null;
   }
 }
@@ -1142,7 +1186,8 @@ function NotificationBell({ member }: { member: Member }) {
 }
 
 function Header({ onHome, theme, onToggleTheme, member, onLogin, onSignup, onLogout, onMyPage = onHome, variant = "main", showHomeButton = false, onMainHome }: { onHome: () => void; theme: Theme; onToggleTheme: () => void; member: Member | null; onLogin: () => void; onSignup: () => void; onLogout: () => void; onMyPage?: () => void; variant?: "main" | "lol"; showHomeButton?: boolean; onMainHome?: () => void }) {
-  const [keyword, setKeyword] = useState("");
+  const [keyword, setKeyword] = useState(() => new URLSearchParams(window.location.search).get("q") ?? "");
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [recentSearches, setRecentSearches] = useState<string[]>(() => {
     try {
@@ -1165,24 +1210,47 @@ function Header({ onHome, theme, onToggleTheme, member, onLogin, onSignup, onLog
     localStorage.setItem("recentSearches", JSON.stringify(recentSearches));
   }, [recentSearches]);
 
-  const submitSearch = async () => {
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("q")) {
+      const input = searchInputRef.current;
+      if (input) {
+        input.focus();
+        input.select();
+      }
+    }
+    // 페이지 진입 시 검색어가 있으면 입력칸의 텍스트를 드래그된 상태처럼 선택해 둔다.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const submitSearch = () => {
     const nextKeyword = keyword.trim();
     if (!nextKeyword) return;
     setRecentSearches((current) => [nextKeyword, ...current.filter((item) => item !== nextKeyword)].slice(0, 6));
 
-    try {
-      const response = await fetch("/api/search-keywords", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ keyword: nextKeyword }),
-      });
-      if (response.ok) {
-        window.dispatchEvent(new CustomEvent("searchKeywordRecorded", { detail: nextKeyword }));
-      }
-    } catch {
-      // 검색 저장 실패가 검색 UI 자체를 막지는 않도록 둡니다.
-    }
+    // 자유 게시판으로 이동하면서 검색어를 전달한다.
+    const url = new URL(window.location.href);
+    url.search = "";
+    url.searchParams.set("board", "free");
+    url.searchParams.set("q", nextKeyword);
+    if (searchScope !== "all") url.searchParams.set("scope", searchScope);
+    window.history.pushState({ view: "free" }, "", url);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    window.scrollTo({ top: 0, behavior: "smooth" });
+
+    // 방금 친 검색어를 자연스럽게 블록(드래그) 선택 상태로 둔다.
+    window.requestAnimationFrame(() => searchInputRef.current?.select());
+
+    // 실시간 검색어 집계용 기록 (실패해도 검색 자체는 진행)
+    fetch("/api/search-keywords", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      credentials: "include",
+      body: JSON.stringify({ keyword: nextKeyword }),
+    })
+      .then((response) => {
+        if (response.ok) window.dispatchEvent(new CustomEvent("searchKeywordRecorded", { detail: nextKeyword }));
+      })
+      .catch(() => undefined);
   };
 
   const hideRecent = () => {
@@ -1196,7 +1264,7 @@ function Header({ onHome, theme, onToggleTheme, member, onLogin, onSignup, onLog
 
   const isLolHeader = variant === "lol";
 
-  return <header className={`header ${isLolHeader ? "lolHeader" : ""}`}><button className="logo logoButton" onClick={onHome}>{isLolHeader ? <><span className="brandLogo logoBox lolLogoMark">L</span><span className="logoText"><span>LOL LOUNGE</span><small>LEAGUE OF LEGENDS</small></span></> : <><img className="brandLogo" src="/brand/lounge-logo.png" alt="" /><span>LOUNGE</span><small>COMMUNITY</small></>}</button><div className="searchArea"><form className={`searchBox ${isSearchFocused ? "searchBoxFocused" : ""}`} onFocus={() => setIsSearchFocused(true)} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsSearchFocused(false); }} onSubmit={(event) => { event.preventDefault(); submitSearch(); }}>{isSearchFocused && <select className="searchScopeSelect" aria-label="검색 범위" value={searchScope} onChange={(event) => setSearchScope(event.target.value)}><option value="all">전체</option><option value="content">글 내용</option><option value="author">글쓴이</option></select>}<input type="search" aria-label="게시판 검색" placeholder={isSearchFocused ? "" : "게시판, 글, 유저를 검색해보세요"} value={keyword} onChange={(event) => setKeyword(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); submitSearch(); } }} /><button aria-label="검색">⌕</button></form>{isSearchFocused && <section className={`recentSearches ${showRecentSearches ? "" : "recentSearchesFolded"}`} onMouseDown={(event) => event.preventDefault()}>{showRecentSearches ? <><div className="recentTitle"><b>최근 검색어</b><button onClick={() => setRecentSearches([])}>전체 삭제</button></div>{recentSearches.length > 0 ? <ul>{recentSearches.map((item) => <li key={item}><button className="recentKeyword" onClick={() => setKeyword(item)}>{item}</button><button className="recentDeleteButton" aria-label={`${item} 삭제`} onClick={() => removeRecent(item)}>×</button></li>)}</ul> : <p className="recentEmpty">최근 검색어가 없습니다.</p>}<button className="recentOffButton" onClick={hideRecent}>최근 검색어 보기 끄기</button></> : <div className="recentFolded"><span>최근 검색어 보기가 꺼져 있습니다.</span><button onClick={() => { setRecentSearches([]); setShowRecentSearches(true); localStorage.removeItem("hideRecentSearches"); }}>최근 검색어 보기</button></div>}</section>}</div><button className="menuToggle" type="button" aria-label="메뉴 열기" onClick={() => setIsMenuOpen((current) => !current)}>☰</button><div className={`userActions ${isMenuOpen ? "open" : ""}`}>{showHomeButton && <button className="homeIconBtn" type="button" aria-label="메인 라운지로 돌아가기" onClick={onMainHome ?? onHome}>⌂</button>}<button className="themeToggle" type="button" aria-label={theme === "dark" ? "라이트 모드로 변경" : "다크 모드로 변경"} onClick={onToggleTheme}>{theme === "dark" ? "☀" : "☾"}</button>{member && <NotificationBell member={member} />}{member ? <><span className="memberGreeting"><b>{member.nickname}</b>님</span><button className="myPageBtn" onClick={onMyPage}>마이페이지</button><button className="loginBtn" onClick={onLogout}>로그아웃</button></> : <><button className="loginBtn" onClick={onLogin}>로그인</button><button className="joinBtn" onClick={onSignup}>회원가입</button></>}</div></header>;
+  return <header className={`header ${isLolHeader ? "lolHeader" : ""}`}><button className="logo logoButton" onClick={onHome}>{isLolHeader ? <><span className="brandLogo logoBox lolLogoMark">L</span><span className="logoText"><span>LOL LOUNGE</span><small>LEAGUE OF LEGENDS</small></span></> : <><img className="brandLogo" src="/brand/lounge-logo.png" alt="" /><span>LOUNGE</span><small>COMMUNITY</small></>}</button><div className="searchArea"><form className={`searchBox ${isSearchFocused ? "searchBoxFocused" : ""}`} onFocus={() => setIsSearchFocused(true)} onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsSearchFocused(false); }} onSubmit={(event) => { event.preventDefault(); submitSearch(); }}>{isSearchFocused && <select className="searchScopeSelect" aria-label="검색 범위" value={searchScope} onChange={(event) => setSearchScope(event.target.value)}><option value="all">전체</option><option value="content">글 내용</option><option value="author">글쓴이</option></select>}<input ref={searchInputRef} type="search" aria-label="게시판 검색" placeholder={isSearchFocused ? "" : "게시판, 글, 유저를 검색해보세요"} value={keyword} onChange={(event) => setKeyword(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); submitSearch(); } }} /><button aria-label="검색">⌕</button></form>{isSearchFocused && <section className={`recentSearches ${showRecentSearches ? "" : "recentSearchesFolded"}`} onMouseDown={(event) => event.preventDefault()}>{showRecentSearches ? <><div className="recentTitle"><b>최근 검색어</b><button onClick={() => setRecentSearches([])}>전체 삭제</button></div>{recentSearches.length > 0 ? <ul>{recentSearches.map((item) => <li key={item}><button className="recentKeyword" onClick={() => setKeyword(item)}>{item}</button><button className="recentDeleteButton" aria-label={`${item} 삭제`} onClick={() => removeRecent(item)}>×</button></li>)}</ul> : <p className="recentEmpty">최근 검색어가 없습니다.</p>}<button className="recentOffButton" onClick={hideRecent}>최근 검색어 보기 끄기</button></> : <div className="recentFolded"><span>최근 검색어 보기가 꺼져 있습니다.</span><button onClick={() => { setRecentSearches([]); setShowRecentSearches(true); localStorage.removeItem("hideRecentSearches"); }}>최근 검색어 보기</button></div>}</section>}</div><button className="menuToggle" type="button" aria-label="메뉴 열기" onClick={() => setIsMenuOpen((current) => !current)}>☰</button><div className={`userActions ${isMenuOpen ? "open" : ""}`}>{showHomeButton && <button className="homeIconBtn" type="button" aria-label="메인 라운지로 돌아가기" onClick={onMainHome ?? onHome}>⌂</button>}<button className="themeToggle" type="button" aria-label={theme === "dark" ? "라이트 모드로 변경" : "다크 모드로 변경"} onClick={onToggleTheme}>{theme === "dark" ? "☀" : "☾"}</button>{member && <NotificationBell member={member} />}{member ? <><span className="memberGreeting"><b>{member.nickname}</b>님</span><button className="myPageBtn" onClick={onMyPage}>마이페이지</button><button className="loginBtn" onClick={onLogout}>로그아웃</button></> : <><button className="loginBtn" onClick={onLogin}>로그인</button><button className="joinBtn" onClick={onSignup}>회원가입</button></>}</div></header>;
 }
 
 
@@ -1358,9 +1426,16 @@ function EnhancedAuthPage({ mode, theme, onToggleTheme, onHome, onModeChange, on
   const [showPasswordConfirm, setShowPasswordConfirm] = useState(false);
   const [error, setError] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [rememberMe, setRememberMe] = useState(false);
+  const [saveId, setSaveId] = useState(false);
+  const [forgotMode, setForgotMode] = useState(false);
+  const [findUsername, setFindUsername] = useState("");
+  const [findEmail, setFindEmail] = useState("");
+  const [findError, setFindError] = useState("");
+  const [findMessage, setFindMessage] = useState("");
+  const [isFinding, setIsFinding] = useState(false);
 
   useEffect(() => {
-    setUsername("");
     setNickname("");
     setEmail("");
     setEmailError("");
@@ -1370,6 +1445,20 @@ function EnhancedAuthPage({ mode, theme, onToggleTheme, onHome, onModeChange, on
     setShowSignupPassword(false);
     setShowPasswordConfirm(false);
     setError("");
+    setForgotMode(false);
+    setFindUsername("");
+    setFindEmail("");
+    setFindError("");
+    setFindMessage("");
+
+    if (mode === "login") {
+      const savedId = localStorage.getItem("lounge-saved-id");
+      setUsername(savedId ?? "");
+      setSaveId(Boolean(savedId));
+      setRememberMe(localStorage.getItem("lounge-remember") === "true");
+    } else {
+      setUsername("");
+    }
   }, [mode]);
 
   const validateEmail = (value: string) => {
@@ -1406,7 +1495,7 @@ function EnhancedAuthPage({ mode, theme, onToggleTheme, onHome, onModeChange, on
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify(isSignup ? { username, password, nickname: nickname.trim(), email: email.trim() } : { username, password }),
+        body: JSON.stringify(isSignup ? { username, password, nickname: nickname.trim(), email: email.trim() } : { username, password, rememberMe }),
       });
       if (!response.ok) throw new Error(await readError(response));
       const loggedIn = await response.json() as Member;
@@ -1415,11 +1504,46 @@ function EnhancedAuthPage({ mode, theme, onToggleTheme, onHome, onModeChange, on
         onModeChange("login");
         return;
       }
+      if (saveId) localStorage.setItem("lounge-saved-id", username);
+      else localStorage.removeItem("lounge-saved-id");
+      localStorage.setItem("lounge-remember", rememberMe ? "true" : "false");
       onSuccess(loggedIn);
     } catch (caughtError) {
       setError(caughtError instanceof Error ? caughtError.message : "잠시 후 다시 시도해 주세요.");
     } finally {
       setIsSubmitting(false);
+    }
+  };
+
+  const submitPasswordFind = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    setFindError("");
+    setFindMessage("");
+
+    if (!/^[a-zA-Z0-9]{7,30}$/.test(findUsername)) {
+      setFindError("아이디는 영문과 숫자 7~30자로 입력해 주세요.");
+      return;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(findEmail)) {
+      setFindError("정확한 형식으로 이메일을 입력하세요.");
+      return;
+    }
+
+    setIsFinding(true);
+    try {
+      const response = await fetch("/api/auth/password/find", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ username: findUsername.trim(), email: findEmail.trim() }),
+      });
+      if (!response.ok) throw new Error(await readError(response));
+      const body = await response.json() as { message?: string };
+      setFindMessage(body.message || "비밀번호를 재설정할 수 있는 링크를 이메일로 보냈습니다.");
+    } catch (caughtError) {
+      setFindError(caughtError instanceof Error ? caughtError.message : "잠시 후 다시 시도해 주세요.");
+    } finally {
+      setIsFinding(false);
     }
   };
 
@@ -1436,7 +1560,19 @@ function EnhancedAuthPage({ mode, theme, onToggleTheme, onHome, onModeChange, on
       <img className="authLogo" src="/brand/lounge-logo.png" alt="LOUNGE" />
       <span className="eyebrow">{isSignup ? "CREATE ACCOUNT" : "WELCOME BACK"}</span>
       <h1>{isSignup ? "회원가입" : "로그인"}</h1>
-      <p>{isSignup ? "라운지 커뮤니티에서 사용할 계정을 만들어보세요." : "계정으로 로그인하고 커뮤니티를 이어가세요."}</p>
+      <p>{!isSignup && forgotMode ? "가입 시 등록한 아이디와 이메일을 입력하세요." : isSignup ? "라운지 커뮤니티에서 사용할 계정을 만들어보세요." : "계정으로 로그인하고 커뮤니티를 이어가세요."}</p>
+      {!isSignup && forgotMode ? (
+        <>
+          <form className="authForm" onSubmit={submitPasswordFind}>
+            <label>아이디<input value={findUsername} onChange={(event) => setFindUsername(event.target.value)} placeholder="가입한 아이디" autoComplete="username" required minLength={7} maxLength={30} /></label>
+            <label>이메일<input type="email" value={findEmail} onChange={(event) => setFindEmail(event.target.value)} placeholder="가입한 이메일" autoComplete="email" required maxLength={254} /></label>
+            {findError && <p className="authError">{findError}</p>}
+            {findMessage && <p className="findSuccess">📧 {findMessage}</p>}
+            <button className="authSubmit" disabled={isFinding}>{isFinding ? "확인 중..." : "비밀번호 재설정 메일 보내기"}</button>
+          </form>
+          <p className="authSwitch"><button onClick={() => { setForgotMode(false); setFindError(""); setFindMessage(""); }}>← 로그인으로 돌아가기</button></p>
+        </>
+      ) : (
       <form className="authForm" onSubmit={submitAuth}>
         {isSignup && <>
           <label>닉네임<input value={nickname} onChange={(event) => setNickname(event.target.value)} placeholder="커뮤니티 닉네임" autoComplete="nickname" required minLength={2} maxLength={30} /></label>
@@ -1445,10 +1581,18 @@ function EnhancedAuthPage({ mode, theme, onToggleTheme, onHome, onModeChange, on
         <label>아이디<input value={username} onChange={(event) => setUsername(event.target.value)} placeholder="영문, 숫자 7자 이상" autoComplete="username" required minLength={7} maxLength={30} pattern="[A-Za-z0-9]{7,30}" title="아이디는 영문과 숫자 7~30자로 입력해 주세요." /><small>영문과 숫자만 사용해 7~30자로 입력해 주세요.</small></label>
         <label>비밀번호{isSignup ? passwordField(password, setPassword, showSignupPassword, setShowSignupPassword, "8자 이상 입력하세요", "비밀번호") : <span className="passwordInput"><input type={showPassword ? "text" : "password"} value={password} onChange={(event) => setPassword(event.target.value)} placeholder="8자 이상 입력하세요" autoComplete="current-password" required minLength={8} maxLength={72} /><button type="button" className="passwordToggle" onClick={() => setShowPassword((current) => !current)} aria-label={showPassword ? "비밀번호 숨기기" : "비밀번호 보기"}>◉</button></span>}<small>8~72자로 입력해 주세요.</small></label>
         {isSignup && <label>비밀번호 확인{passwordField(passwordConfirm, setPasswordConfirm, showPasswordConfirm, setShowPasswordConfirm, "비밀번호를 한 번 더 입력하세요", "비밀번호 확인")}</label>}
+        {!isSignup && (
+          <div className="authOptions">
+            <label className="authCheck"><input type="checkbox" checked={rememberMe} onChange={(event) => setRememberMe(event.target.checked)} /> 로그인 유지</label>
+            <label className="authCheck"><input type="checkbox" checked={saveId} onChange={(event) => setSaveId(event.target.checked)} /> 아이디 저장</label>
+            <button type="button" className="forgotLink" onClick={() => { setForgotMode(true); setError(""); }}>비밀번호 찾기</button>
+          </div>
+        )}
         {error && <p className="authError">{error}</p>}
         {isSignup ? <div className="authActions"><button type="button" className="authCancel" onClick={onHome}>취소</button><button className="authSubmit" disabled={isSubmitting}>{isSubmitting ? "처리 중..." : "가입하기"}</button></div> : <button className="authSubmit" disabled={isSubmitting}>{isSubmitting ? "처리 중..." : "로그인"}</button>}
       </form>
-      <p className="authSwitch">{isSignup ? "이미 계정이 있나요?" : "아직 계정이 없나요?"} <button onClick={() => onModeChange(isSignup ? "login" : "signup")}>{isSignup ? "로그인" : "회원가입"}</button></p>
+      )}
+      {!(!isSignup && forgotMode) && <p className="authSwitch">{isSignup ? "이미 계정이 있나요?" : "아직 계정이 없나요?"} <button onClick={() => onModeChange(isSignup ? "login" : "signup")}>{isSignup ? "로그인" : "회원가입"}</button></p>}
     </section></main>
   </>;
 }
@@ -1589,8 +1733,18 @@ function EnhancedApp() {
 
   const updateMember = (next: Member | null) => {
     setMember(next);
-    if (next) localStorage.setItem(MEMBER_CACHE_KEY, JSON.stringify(next));
-    else localStorage.removeItem(MEMBER_CACHE_KEY);
+    if (!next) {
+      clearCachedMember();
+      return;
+    }
+    const value = JSON.stringify(next);
+    if (localStorage.getItem("lounge-remember") === "true") {
+      localStorage.setItem(MEMBER_CACHE_KEY, value);
+      sessionStorage.removeItem(MEMBER_CACHE_KEY);
+    } else {
+      sessionStorage.setItem(MEMBER_CACHE_KEY, value);
+      localStorage.removeItem(MEMBER_CACHE_KEY);
+    }
   };
 
   const notify = (message: string) => {

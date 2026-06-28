@@ -1720,3 +1720,309 @@ html[data-theme="dark"] .boardTable .tableHead {
   border-radius: 14px;
   box-shadow: 0 10px 26px var(--shadow);
 }
+
+
+/* ============================================================
+   Free board search result bar
+   ============================================================ */
+.searchResultBar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 16px 16px 0;
+  padding: 13px 16px;
+  border: 1px solid color-mix(in srgb, #2563eb 28%, var(--row-border));
+  border-radius: 12px;
+  background: linear-gradient(120deg, color-mix(in srgb, #2563eb 12%, var(--surface)), var(--surface));
+  animation: notificationPop .18s ease-out;
+}
+.searchResultText {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.searchResultIcon {
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  background: color-mix(in srgb, #2563eb 18%, var(--surface));
+  color: #2563eb;
+  font-size: 15px;
+  font-weight: 900;
+}
+.searchResultText b {
+  overflow: hidden;
+  max-width: 42vw;
+  color: var(--text);
+  font-size: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.searchResultText small {
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface-soft);
+  color: var(--subtle);
+  font-size: 11px;
+  font-weight: 800;
+}
+.searchResultText strong { color: #2563eb; font-size: 15px; }
+.searchClearButton {
+  flex: 0 0 auto;
+  padding: 7px 13px;
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  background: var(--surface);
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 800;
+  transition: border-color .14s ease, color .14s ease, background .14s ease;
+}
+.searchClearButton:hover {
+  border-color: #ef4444;
+  color: #ef4444;
+  background: color-mix(in srgb, #ef4444 8%, var(--surface));
+}
+
+/* search box selection highlight — make the drag-selected keyword pop */
+.searchBox input::selection { background: #4f7df3; color: #fff; }
+
+
+/* ============================================================
+   Login options (remember / save id / forgot) + password find
+   ============================================================ */
+.authOptions {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: -2px 0 2px;
+}
+.authCheck {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--muted);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.authCheck input {
+  width: 16px;
+  height: 16px;
+  accent-color: #2563eb;
+  cursor: pointer;
+}
+.forgotLink {
+  margin-left: auto;
+  border: 0;
+  background: transparent;
+  color: #2563eb;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 700;
+}
+.forgotLink:hover { text-decoration: underline; }
+.findSuccess {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: -2px 0 0;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, #16a34a 35%, var(--row-border));
+  border-radius: 10px;
+  background: color-mix(in srgb, #16a34a 10%, var(--surface));
+  color: #15803d;
+  font-size: 13px;
+  font-weight: 700;
+  line-height: 1.5;
+  text-align: left;
+}
+html[data-theme="dark"] .findSuccess { color: #86efac; }
+@media (max-width: 600px) {
+  .authOptions { gap: 10px; }
+  .forgotLink { margin-left: 0; }
+}
+
+
+/* ============================================================
+   "모든 라운지" cards — parallelogram "blind" sweep (additive)
+   기존 호버(리프트/글로우/아이콘/화살표)는 유지하고 ::after를
+   비스듬한 평행사변형 블라인드 바 스윕으로 교체한다.
+   ============================================================ */
+.categoryGrid .categoryCard::after {
+  content: "";
+  position: absolute;
+  top: -25%;
+  left: -35%;
+  width: 170%;
+  height: 150%;
+  z-index: 0; /* 텍스트/아이콘(z-index:1) 뒤, 카드 배경 위 */
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0 30px,
+    color-mix(in srgb, var(--point-color) 16%, rgba(255, 255, 255, .42)) 30px 44px,
+    transparent 44px 74px
+  );
+  transform: skewX(-22deg) translateX(-48%);
+  opacity: 0;
+  transition: transform .62s cubic-bezier(.2, .8, .2, 1), opacity .34s ease;
+}
+.categoryGrid .categoryCard:not(.comingSoon):hover::after {
+  transform: skewX(-22deg) translateX(48%);
+  opacity: .9;
+}
+html[data-theme="dark"] .categoryGrid .categoryCard::after {
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0 30px,
+    color-mix(in srgb, var(--point-color) 32%, rgba(255, 255, 255, .14)) 30px 44px,
+    transparent 44px 74px
+  );
+}
+
+
+/* category blind sweep — tuned: richer color, softened (feathered) edges */
+.categoryGrid .categoryCard::after {
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0 16px,
+    color-mix(in srgb, var(--point-color) 36%, rgba(255, 255, 255, .5)) 30px 40px,
+    transparent 54px 72px
+  );
+}
+.categoryGrid .categoryCard:not(.comingSoon):hover::after {
+  opacity: .72;
+}
+html[data-theme="dark"] .categoryGrid .categoryCard::after {
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0 16px,
+    color-mix(in srgb, var(--point-color) 46%, rgba(255, 255, 255, .18)) 30px 40px,
+    transparent 54px 72px
+  );
+}
+
+
+/* category blind sweep — revert to crisp/vivid look + denser bar spacing */
+.categoryGrid .categoryCard::after {
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0 20px,
+    color-mix(in srgb, var(--point-color) 16%, rgba(255, 255, 255, .42)) 20px 30px,
+    transparent 30px 40px
+  );
+}
+.categoryGrid .categoryCard:not(.comingSoon):hover::after {
+  opacity: .9;
+}
+html[data-theme="dark"] .categoryGrid .categoryCard::after {
+  background: repeating-linear-gradient(
+    90deg,
+    transparent 0 20px,
+    color-mix(in srgb, var(--point-color) 32%, rgba(255, 255, 255, .14)) 20px 30px,
+    transparent 30px 40px
+  );
+}
+
+
+/* ============================================================
+   Category blind sweep — bars MERGE into one solid panel at the end
+   (animate bar width via @property so stripes fill the gaps)
+   ============================================================ */
+@property --catBarW {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 10px;
+}
+
+.categoryGrid .categoryCard {
+  --catBarColor: color-mix(in srgb, var(--point-color) 16%, rgba(255, 255, 255, .42));
+}
+html[data-theme="dark"] .categoryGrid .categoryCard {
+  --catBarColor: color-mix(in srgb, var(--point-color) 32%, rgba(255, 255, 255, .14));
+}
+
+.categoryGrid .categoryCard::after,
+html[data-theme="dark"] .categoryGrid .categoryCard::after {
+  background: repeating-linear-gradient(
+    90deg,
+    var(--catBarColor) 0 var(--catBarW),
+    transparent var(--catBarW) 40px
+  );
+  transform: skewX(-22deg) translateX(-60%);
+  opacity: 0;
+  transition: opacity .3s ease, transform .3s ease;
+  animation: none;
+}
+
+.categoryGrid .categoryCard:not(.comingSoon):hover::after {
+  animation: catBlindMerge .9s cubic-bezier(.2, .8, .2, 1) forwards;
+}
+
+@keyframes catBlindMerge {
+  0%   { transform: skewX(-22deg) translateX(-60%); opacity: 0;  --catBarW: 10px; }
+  18%  { opacity: .9; }
+  70%  { transform: skewX(-22deg) translateX(10%);  opacity: .9; --catBarW: 10px; }
+  100% { transform: skewX(-22deg) translateX(0%);   opacity: .9; --catBarW: 40px; }
+}
+
+/* category blind — faster merge (shorter merge window at the end) */
+@keyframes catBlindMerge {
+  0%   { transform: skewX(-22deg) translateX(-60%); opacity: 0;  --catBarW: 10px; }
+  18%  { opacity: .9; }
+  86%  { transform: skewX(-22deg) translateX(8%);  opacity: .9; --catBarW: 10px; }
+  100% { transform: skewX(-22deg) translateX(0%);  opacity: .9; --catBarW: 40px; }
+}
+
+/* category blind — even faster merge (near-snap at the very end) */
+@keyframes catBlindMerge {
+  0%   { transform: skewX(-22deg) translateX(-60%); opacity: 0;  --catBarW: 10px; }
+  18%  { opacity: .9; }
+  93%  { transform: skewX(-22deg) translateX(6%);  opacity: .9; --catBarW: 10px; }
+  100% { transform: skewX(-22deg) translateX(0%);  opacity: .9; --catBarW: 40px; }
+}
+
+/* category blind — full snap merge (thin bars hold, then snap to solid at the end) */
+@keyframes catBlindMerge {
+  0%   { transform: skewX(-22deg) translateX(-60%); opacity: 0;  --catBarW: 10px; }
+  18%  { opacity: .9; }
+  99%  { transform: skewX(-22deg) translateX(2%);  opacity: .9; --catBarW: 10px; }
+  100% { transform: skewX(-22deg) translateX(0%);  opacity: .9; --catBarW: 40px; }
+}
+
+/* category blind — appear fast: shorter total + earlier snap merge */
+.categoryGrid .categoryCard:not(.comingSoon):hover::after {
+  animation: catBlindMerge .42s cubic-bezier(.2, .8, .2, 1) forwards;
+}
+@keyframes catBlindMerge {
+  0%   { transform: skewX(-22deg) translateX(-55%); opacity: 0;  --catBarW: 10px; }
+  14%  { opacity: .9; }
+  44%  { transform: skewX(-22deg) translateX(3%);  opacity: .9; --catBarW: 10px; }
+  45%  { transform: skewX(-22deg) translateX(2%);  opacity: .9; --catBarW: 40px; }
+  100% { transform: skewX(-22deg) translateX(0%);  opacity: .9; --catBarW: 40px; }
+}
+
+/* category blind — natural close: continuous sweep, blinds smoothly fill (no stop/snap) */
+.categoryGrid .categoryCard::after,
+html[data-theme="dark"] .categoryGrid .categoryCard::after {
+  transition: opacity .28s ease;
+}
+.categoryGrid .categoryCard:not(.comingSoon):hover::after {
+  animation: catBlindMerge .55s cubic-bezier(.22, .61, .36, 1) forwards;
+}
+@keyframes catBlindMerge {
+  0%   { transform: skewX(-22deg) translateX(-62%); opacity: 0;   --catBarW: 10px; }
+  22%  { opacity: .92; }
+  58%  { --catBarW: 10px; }
+  100% { transform: skewX(-22deg) translateX(0%);   opacity: .92; --catBarW: 40px; }
+}
