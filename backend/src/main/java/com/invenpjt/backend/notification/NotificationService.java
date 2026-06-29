@@ -23,7 +23,7 @@ public class NotificationService {
 
     @Transactional
     public void notifyComment(Member recipient, String actorName, String postTitle, Long postId) {
-        if (recipient == null || !recipient.isNotifyComment()) {
+        if (recipient == null) {
             return;
         }
         String message = actorName + "님이 '" + shorten(postTitle) + "' 글에 댓글을 남겼습니다.";
@@ -32,7 +32,7 @@ public class NotificationService {
 
     @Transactional
     public void notifyPostLike(Member recipient, String actorName, String postTitle, Long postId) {
-        if (recipient == null || !recipient.isNotifyReaction()) {
+        if (recipient == null) {
             return;
         }
         String message = actorName + "님이 '" + shorten(postTitle) + "' 글을 추천했습니다.";
@@ -66,19 +66,6 @@ public class NotificationService {
     @Transactional
     public void markAllRead(Long memberId) {
         notificationRepository.markAllReadByRecipient(getMemberById(memberId));
-    }
-
-    @Transactional(readOnly = true)
-    public NotificationSettingsResponse getSettings(Long memberId) {
-        Member member = getMemberById(memberId);
-        return new NotificationSettingsResponse(member.isNotifyComment(), member.isNotifyReaction());
-    }
-
-    @Transactional
-    public NotificationSettingsResponse updateSettings(Long memberId, NotificationSettingsRequest request) {
-        Member member = getMemberById(memberId);
-        member.updateNotificationSettings(request.notifyComment(), request.notifyReaction());
-        return new NotificationSettingsResponse(member.isNotifyComment(), member.isNotifyReaction());
     }
 
     private String shorten(String title) {

@@ -2026,3 +2026,6 @@ html[data-theme="dark"] .categoryGrid .categoryCard::after {
   58%  { --catBarW: 10px; }
   100% { transform: skewX(-22deg) translateX(0%);   opacity: .92; --catBarW: 40px; }
 }
+
+/* MyPage: settings removed → profile spans full width */
+.myPageModal .myPageGridSingle { grid-template-columns: 1fr; }

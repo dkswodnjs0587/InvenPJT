@@ -106,11 +106,6 @@ type NotificationItem = {
   createdAt: string;
 };
 
-type NotificationSettings = {
-  notifyComment: boolean;
-  notifyReaction: boolean;
-};
-
 function formatBoardTime(createdAt: string) {
   const date = new Date(createdAt);
   if (Number.isNaN(date.getTime())) return "-";
@@ -1150,19 +1145,19 @@ function NotificationBell({ member }: { member: Member }) {
 
   return (
     <div className="notificationBell" onBlur={(event) => { if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setIsOpen(false); }}>
-      <button type="button" className="notificationToggle" aria-label="알림" onClick={toggleOpen}>
+      <button type="button" className="notificationToggle" aria-label="내 글 소식" title="내 글 소식" onClick={toggleOpen}>
         <span aria-hidden="true">🔔</span>
         {unreadCount > 0 && <span className="notificationBadge">{unreadCount > 99 ? "99+" : unreadCount}</span>}
       </button>
       {isOpen && (
         <section className="notificationPanel" onMouseDown={(event) => event.preventDefault()}>
           <div className="notificationPanelHead">
-            <b>알림</b>
-            <button type="button" onClick={markAllRead} disabled={items.every((entry) => entry.read)}>모두 읽음</button>
+            <b>내 글 소식</b>
+            <button type="button" onClick={markAllRead} disabled={items.every((entry) => entry.read)}>모두 확인</button>
           </div>
           <div className="notificationList">
             {isLoading && <p className="notificationEmpty">불러오는 중...</p>}
-            {!isLoading && items.length === 0 && <p className="notificationEmpty">받은 알림이 없습니다.</p>}
+            {!isLoading && items.length === 0 && <p className="notificationEmpty">아직 내 글에 달린 댓글이나 추천이 없습니다.</p>}
             {!isLoading && items.map((item) => (
               <button
                 type="button"
@@ -1602,12 +1597,8 @@ function LolLounge({ header }: { header: ReactNode }) {
 }
 
 function MyPageModal({ member, onClose }: { member: Member; onClose: () => void }) {
-  const [saved, setSaved] = useState(false);
   const [activity, setActivity] = useState<MyPageActivity | null>(null);
   const [activityError, setActivityError] = useState("");
-  const [notifyComment, setNotifyComment] = useState(true);
-  const [notifyReaction, setNotifyReaction] = useState(true);
-  const [isSavingSettings, setIsSavingSettings] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -1622,39 +1613,6 @@ function MyPageModal({ member, onClose }: { member: Member; onClose: () => void 
       });
     return () => { active = false; };
   }, []);
-
-  useEffect(() => {
-    let active = true;
-    fetch("/api/notifications/settings", { credentials: "include" })
-      .then((response) => response.ok ? response.json() as Promise<NotificationSettings> : null)
-      .then((settings) => {
-        if (active && settings) {
-          setNotifyComment(settings.notifyComment);
-          setNotifyReaction(settings.notifyReaction);
-        }
-      })
-      .catch(() => undefined);
-    return () => { active = false; };
-  }, []);
-
-  const saveSettings = async (event: FormEvent<HTMLFormElement>) => {
-    event.preventDefault();
-    setIsSavingSettings(true);
-    setSaved(false);
-    try {
-      const response = await fetch("/api/notifications/settings", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        credentials: "include",
-        body: JSON.stringify({ notifyComment, notifyReaction }),
-      });
-      if (response.ok) setSaved(true);
-    } catch {
-      // 저장 실패는 조용히 무시하고 사용자가 다시 시도하도록 둡니다.
-    } finally {
-      setIsSavingSettings(false);
-    }
-  };
 
   const renderPostList = (posts: BoardPost[], emptyText: string) => (
     <ul className="myPostMiniList">
@@ -1679,20 +1637,10 @@ function MyPageModal({ member, onClose }: { member: Member; onClose: () => void 
           </div>
           <button className="modalClose" type="button" aria-label="마이페이지 닫기" onClick={onClose}>×</button>
         </div>
-        <section className="myPageGrid">
+        <section className="myPageGrid myPageGridSingle">
           <section className="myProfileCard">
             <div className="profileBadge">{member.nickname.slice(0, 1)}</div>
             <div><span className="eyebrow">MY LOUNGE</span><h1>{member.nickname}님의 라운지</h1><p>{member.username} · {member.email || "이메일 없음"}</p></div>
-          </section>
-          <section className="mySettingsCard">
-            <div className="panelHeading"><div><h2>개인 설정</h2><p>라운지 이용 환경을 설정하세요</p></div></div>
-            <form onSubmit={saveSettings}>
-              <label>선호 테마<select defaultValue="시스템 설정"><option>시스템 설정</option><option>라이트 모드</option><option>다크 모드</option></select></label>
-              <label className="checkLabel"><input type="checkbox" checked={notifyComment} onChange={(event) => { setNotifyComment(event.target.checked); setSaved(false); }} /> 댓글 알림 받기</label>
-              <label className="checkLabel"><input type="checkbox" checked={notifyReaction} onChange={(event) => { setNotifyReaction(event.target.checked); setSaved(false); }} /> 내 글 반응(추천) 알림 받기</label>
-              <button className="authSubmit" disabled={isSavingSettings}>{isSavingSettings ? "저장 중..." : "설정 저장"}</button>
-              {saved && <p className="settingsSaved">설정이 저장되었습니다.</p>}
-            </form>
           </section>
         </section>
         <section className="myActivity"><h2>활동 요약</h2><div><strong>{activity?.postCount ?? 0}</strong><span>내가 쓴 게시글</span></div><div><strong>{activity?.receivedCommentCount ?? 0}</strong><span>받은 댓글</span></div><div><strong>{activity?.favoriteCount ?? 0}</strong><span>즐겨찾기</span></div></section>
