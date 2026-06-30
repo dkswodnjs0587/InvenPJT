@@ -6,6 +6,10 @@ import com.invenpjt.backend.member.Member;
 import com.invenpjt.backend.member.MemberRepository;
 import com.invenpjt.backend.notification.NotificationService;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -52,28 +56,68 @@ public class PostService {
     @Transactional(readOnly = true)
     public List<PostResponse> getPostsByBoard(String boardSlug, Long currentMemberId) {
         Board board = getBoardBySlug(boardSlug);
-        Member currentMember = findCurrentMember(currentMemberId);
-        return postRepository.findByBoardOrderByCreatedAtDesc(board).stream()
-                .map(post -> toPostResponse(post, currentMember))
+        return postRepository.findSummariesByBoard(board, currentMemberId).stream()
+                .map(PostSummaryRow::toResponse)
                 .toList();
     }
 
     @Transactional(readOnly = true)
+    public PostPageResponse getPostPageByBoard(
+            String boardSlug,
+            Long currentMemberId,
+            int page,
+            int size,
+            String sort,
+            String query,
+            String scope
+    ) {
+        Board board = getBoardBySlug(boardSlug);
+        int safePage = Math.max(0, page);
+        int safeSize = Math.min(Math.max(1, size), 50);
+        String safeSort = switch (sort == null ? "latest" : sort) {
+            case "likes", "views" -> sort;
+            default -> "latest";
+        };
+        String safeScope = switch (scope == null ? "all" : scope) {
+            case "title", "content", "author" -> scope;
+            default -> "all";
+        };
+        String keyword = query == null || query.trim().isBlank()
+                ? null
+                : "%" + query.trim().toLowerCase() + "%";
+
+        long totalItems = postRepository.countSummariesByBoard(board, keyword, safeScope);
+        int totalPages = Math.max(1, (int) Math.ceil((double) totalItems / safeSize));
+        int boundedPage = Math.min(safePage, totalPages - 1);
+        List<PostResponse> items = postRepository.findPagedSummariesByBoard(
+                        board,
+                        currentMemberId,
+                        keyword,
+                        safeScope,
+                        safeSort,
+                        PageRequest.of(boundedPage, safeSize)
+                ).stream()
+                .map(PostSummaryRow::toResponse)
+                .toList();
+
+        return new PostPageResponse(items, totalItems, totalPages, boundedPage, safeSize);
+    }
+
+    @Transactional(readOnly = true)
     public List<PostResponse> getLatestPosts(Long currentMemberId) {
-        Member currentMember = findCurrentMember(currentMemberId);
-        return postRepository.findTop10ByOrderByCreatedAtDesc().stream()
-                .map(post -> toPostResponse(post, currentMember))
+        return postRepository.findLatestSummaries(currentMemberId, PageRequest.of(0, 10)).stream()
+                .map(PostSummaryRow::toResponse)
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public MyPageActivityResponse getMyPageActivity(Long memberId) {
         Member member = getMemberById(memberId);
-        List<PostResponse> myPosts = postRepository.findTop5ByAuthorOrderByCreatedAtDesc(member).stream()
-                .map(post -> toPostResponse(post, member))
+        List<PostResponse> myPosts = postRepository.findAuthorSummaries(member, PageRequest.of(0, 5)).stream()
+                .map(PostSummaryRow::toResponse)
                 .toList();
-        List<PostResponse> favoritePosts = postBookmarkRepository.findTop5ByMemberOrderByCreatedAtDesc(member).stream()
-                .map(bookmark -> toPostResponse(bookmark.getPost(), member))
+        List<PostResponse> favoritePosts = postBookmarkRepository.findBookmarkedPostSummaries(member, PageRequest.of(0, 5)).stream()
+                .map(PostSummaryRow::toResponse)
                 .toList();
 
         return new MyPageActivityResponse(
@@ -212,6 +256,41 @@ public class PostService {
         boolean dislikedByMe = currentMember != null && postDislikeRepository.existsByPostAndMember(post, currentMember);
         boolean bookmarkedByMe = currentMember != null && postBookmarkRepository.existsByPostAndMember(post, currentMember);
         return PostResponse.from(post, likeCount, dislikeCount, commentCount, likedByMe, dislikedByMe, bookmarkedByMe);
+    }
+
+    private List<PostResponse> toPostResponses(List<Post> posts, Member currentMember) {
+        if (posts.isEmpty()) return List.of();
+
+        List<Long> postIds = posts.stream().map(Post::getId).toList();
+        Map<Long, Long> likeCounts = toCountMap(postLikeRepository.countByPostIds(postIds));
+        Map<Long, Long> dislikeCounts = toCountMap(postDislikeRepository.countByPostIds(postIds));
+        Map<Long, Long> commentCounts = toCountMap(postCommentRepository.countByPostIds(postIds));
+        Set<Long> likedPostIds = currentMember == null
+                ? Set.of()
+                : Set.copyOf(postLikeRepository.findPostIdsByMemberAndPostIds(currentMember, postIds));
+        Set<Long> dislikedPostIds = currentMember == null
+                ? Set.of()
+                : Set.copyOf(postDislikeRepository.findPostIdsByMemberAndPostIds(currentMember, postIds));
+        Set<Long> bookmarkedPostIds = currentMember == null
+                ? Set.of()
+                : Set.copyOf(postBookmarkRepository.findPostIdsByMemberAndPostIds(currentMember, postIds));
+
+        return posts.stream()
+                .map(post -> PostResponse.from(
+                        post,
+                        Math.toIntExact(likeCounts.getOrDefault(post.getId(), 0L)),
+                        Math.toIntExact(dislikeCounts.getOrDefault(post.getId(), 0L)),
+                        Math.toIntExact(commentCounts.getOrDefault(post.getId(), 0L)),
+                        likedPostIds.contains(post.getId()),
+                        dislikedPostIds.contains(post.getId()),
+                        bookmarkedPostIds.contains(post.getId())
+                ))
+                .toList();
+    }
+
+    private Map<Long, Long> toCountMap(List<PostCountSummary> counts) {
+        return counts.stream()
+                .collect(Collectors.toMap(PostCountSummary::getPostId, PostCountSummary::getCount));
     }
 
     private CommentResponse toCommentResponse(PostComment comment, Member currentMember) {
