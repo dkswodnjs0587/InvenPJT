@@ -1,4 +1,4 @@
-﻿* { box-sizing: border-box; }
+* { box-sizing: border-box; }
 :root { font-family: Pretendard, "Noto Sans KR", system-ui, sans-serif; color: #172033; background: #f5f7fb; }
 html { min-width: 360px; --page-bg: #f5f7fb; --surface: #ffffff; --surface-soft: #f7f9fc; --border: #cbd5e1; --text: #172033; --muted: #64748b; --subtle: #8490a3; --header-bg: #101827; --header-input: #202b3e; --row-border: #e2e8f0; --shadow: rgba(39,61,99,.1); color-scheme: light; }
 html[data-theme="dark"] { --page-bg: #1b2438; --surface: #26314a; --surface-soft: #313e5a; --border: #4a5a76; --text: #eaf1fb; --muted: #c2cee0; --subtle: #93a3bd; --header-bg: #141d30; --header-input: #233048; --row-border: #3a4763; --shadow: rgba(0,0,0,.32); color-scheme: dark; }
@@ -568,13 +568,12 @@ html[data-theme="dark"] .fifaQuickGrid article {
 @media (max-width: 600px) { .modalOverlay { padding: 12px; align-items: start; } .myPageModal { max-height: calc(100vh - 24px); padding: 18px; border-radius: 12px; } .modalHeader h1 { font-size: 21px; } }
 .searchBox { align-items: center; gap: 8px; padding: 0 6px 0 14px; }
 .searchBoxFocused { padding-left: 8px; }
-.searchScopeSelect { height: 34px; flex: 0 0 auto; border: 1px solid rgba(165,177,196,.55); border-radius: 8px; background: rgba(255,255,255,.08); color: white; padding: 0 28px 0 10px; font-size: 13px; font-weight: 800; outline: 0; cursor: pointer; }
-.searchScopeSelect option { color: #253248; background: white; }
+.searchScopeTabs { height: 34px; flex: 0 0 auto; display: inline-flex; align-items: center; gap: 4px; padding: 3px; border: 1px solid rgba(165,177,196,.42); border-radius: 999px; background: rgba(255,255,255,.08); box-shadow: inset 0 1px 0 rgba(255,255,255,.08); }
 .searchBox input { height: 100%; }
 .searchBox button { height: 38px; width: 42px; display: grid; place-items: center; border-radius: 9px; line-height: 1; font-size: 24px; }
 .searchBox button:hover { background: rgba(255,255,255,.10); }
-html[data-theme="dark"] .searchScopeSelect option { color: #e5ecf7; background: #151b26; }
-@media (max-width: 600px) { .searchScopeSelect { max-width: 92px; font-size: 12px; padding-left: 8px; } .searchBox { gap: 6px; } }
+
+@media (max-width: 600px) { .searchScopeTabs { max-width: 188px; overflow-x: auto; scrollbar-width: none; } .searchScopeTabs::-webkit-scrollbar { display: none; } .searchBox { gap: 6px; } }
 .searchBox button { padding-bottom: 2px; transform: translateY(-2px); }
 
 
@@ -2149,7 +2148,6 @@ html[data-theme="dark"] .realtimePanel li:nth-child(-n+3) b {
 }
 
 /* #3: 롤 라운지의 자유게시판 진입 버튼/카드 */
-.lolBoardButton { min-width: 156px; }
 .lolQuickGrid .lolBoardCard {
   min-height: 130px;
   padding: 20px;
@@ -2182,4 +2180,192 @@ html[data-theme="dark"] .lolQuickGrid .lolBoardCard {
   z-index: 5;
   padding-top: 24px;
   background: var(--surface);
+}
+/* Search scope pill buttons */
+.searchBox .searchScopeTabs button {
+  width: auto;
+  min-width: 46px;
+  height: 26px;
+  padding: 0 10px 1px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: #b9c8e0;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: -.2px;
+  transform: none;
+  transition: background .16s ease, color .16s ease, box-shadow .16s ease;
+}
+.searchBox .searchScopeTabs button:hover {
+  background: rgba(255,255,255,.12);
+  color: #fff;
+}
+.searchBox .searchScopeTabs button.active {
+  background: linear-gradient(135deg, #ffffff, #eaf1ff);
+  color: #172033;
+  box-shadow: 0 6px 14px rgba(0,0,0,.18);
+}
+.lolHeader .searchScopeTabs {
+  border-color: rgba(248, 211, 111, .42);
+  background: rgba(255,255,255,.10);
+}
+.lolHeader .searchBox .searchScopeTabs button.active {
+  background: linear-gradient(135deg, #fff7d6, #f8d36f);
+  color: #172033;
+}
+.fifaHeader .searchScopeTabs {
+  border-color: rgba(134, 239, 172, .42);
+  background: rgba(255,255,255,.10);
+}
+.fifaHeader .searchBox .searchScopeTabs button.active {
+  background: linear-gradient(135deg, #dcfce7, #86efac);
+  color: #0f2417;
+}
+html[data-theme="dark"] .searchBox .searchScopeTabs button.active {
+  background: linear-gradient(135deg, #f8fbff, #dbeafe);
+  color: #101827;
+}
+/* LOL 자유게시판 전용 테마 */
+.lolBoardHero {
+  background:
+    radial-gradient(circle at 80% 12%, rgba(248, 211, 111, .48), transparent 28%),
+    linear-gradient(118deg, #07111f 0%, #0b2f45 54%, #4c3910 100%);
+  box-shadow: 0 18px 42px rgba(7, 17, 31, .32), inset 0 0 0 1px rgba(248, 211, 111, .22);
+}
+.lolBoardHero .boardHeroIcon {
+  background: linear-gradient(135deg, rgba(248, 211, 111, .22), rgba(255,255,255,.08));
+  box-shadow: inset 0 0 0 1px rgba(248, 211, 111, .28);
+}
+.lolBoardHero .eyebrow {
+  color: #f8d36f;
+}
+.lolBoardHero p {
+  color: #d8e7f6;
+}
+.lolBoardHero .writeButton {
+  background: linear-gradient(135deg, #fff7d6, #f8d36f);
+  color: #07111f;
+  box-shadow: 0 12px 28px rgba(7, 17, 31, .24);
+}
+.lolBoardHero .writeButton:hover {
+  background: linear-gradient(135deg, #fff3bd, #d4a83f);
+}
+.lolBoardTable {
+  border-color: rgba(248, 211, 111, .34);
+  box-shadow: 0 18px 42px rgba(7, 17, 31, .12);
+}
+.lolBoardTable .tableTools strong,
+.lolBoardTable .tableTools .sortSelected,
+.lolBoardTable .noticeRow > span:first-child {
+  color: #d4a83f;
+}
+.lolBoardTable .pagination .current {
+  background: #d4a83f;
+  color: #07111f;
+}
+.lolBoardTable .postRow em {
+  background: rgba(248, 211, 111, .16);
+  color: #9a6b14;
+}
+/* Badminton lounge theme */
+.badmintonHeader {
+  background: linear-gradient(90deg, #052e24, #0f766e 56%, #84cc16);
+  box-shadow: 0 12px 32px rgba(5, 46, 36, .28);
+}
+.badmintonHeader .logo { letter-spacing: 0; }
+.badmintonHeader .logoBox {
+  background: linear-gradient(135deg, #f8fafc, #bef264 58%, #22c55e);
+  color: #052e24;
+}
+.badmintonHeader .logo small { color: #d9f99d; }
+.badmintonHeader .logoText { gap: 6px; }
+.badmintonHeader .searchBox {
+  border-color: rgba(190, 242, 100, .46);
+  background: rgba(255,255,255,.11);
+}
+.badmintonHeader .searchBox:focus-within { border-color: #bef264; }
+.badmintonHeader .joinBtn {
+  background: #bef264;
+  color: #052e24;
+}
+.badmintonHeader .loginBtn,
+.badmintonHeader .myPageBtn,
+.badmintonHeader .themeToggle,
+.badmintonHeader .homeIconBtn,
+.badmintonHeader .notificationToggle {
+  border-color: rgba(190, 242, 100, .52);
+}
+.badmintonHero {
+  border-color: rgba(190, 242, 100, .42);
+  background:
+    radial-gradient(circle at 83% 20%, rgba(248, 250, 252, .36), transparent 21%),
+    radial-gradient(circle at 72% 72%, rgba(190, 242, 100, .22), transparent 24%),
+    linear-gradient(125deg, #052e24, #0f766e 58%, #84cc16);
+  box-shadow: 0 20px 46px rgba(5, 46, 36, .24);
+}
+.badmintonHero .eyebrow { color: #d9f99d; }
+.badmintonHero h1 { color: #ffffff; }
+.badmintonHero p { color: #ecfeff; }
+.badmintonQuickGrid article,
+.badmintonQuickGrid .badmintonBoardCard {
+  border-color: rgba(132, 204, 22, .34);
+  background: color-mix(in srgb, var(--surface) 88%, #ecfccb);
+}
+.badmintonQuickGrid article:hover,
+.badmintonQuickGrid .badmintonBoardCard:hover {
+  border-color: #84cc16;
+  box-shadow: 0 16px 34px rgba(5, 46, 36, .16);
+}
+html[data-theme="dark"] .badmintonQuickGrid article,
+html[data-theme="dark"] .badmintonQuickGrid .badmintonBoardCard {
+  background: linear-gradient(145deg, #09251e, #12362f);
+  border-color: rgba(190, 242, 100, .36);
+}
+.badmintonHeader .searchScopeTabs {
+  border-color: rgba(190, 242, 100, .46);
+  background: rgba(255,255,255,.10);
+}
+.badmintonHeader .searchBox .searchScopeTabs button.active {
+  background: linear-gradient(135deg, #f7fee7, #bef264);
+  color: #052e24;
+}
+.badmintonBoardHero {
+  background:
+    radial-gradient(circle at 82% 14%, rgba(248, 250, 252, .42), transparent 24%),
+    radial-gradient(circle at 74% 76%, rgba(190, 242, 100, .30), transparent 26%),
+    linear-gradient(118deg, #052e24 0%, #0f766e 56%, #84cc16 100%);
+  box-shadow: 0 18px 42px rgba(5, 46, 36, .28), inset 0 0 0 1px rgba(190, 242, 100, .24);
+}
+.badmintonBoardHero .boardHeroIcon {
+  background: linear-gradient(135deg, rgba(248,250,252,.22), rgba(190,242,100,.16));
+  box-shadow: inset 0 0 0 1px rgba(190, 242, 100, .30);
+}
+.badmintonBoardHero .eyebrow { color: #d9f99d; }
+.badmintonBoardHero p { color: #ecfeff; }
+.badmintonBoardHero .writeButton {
+  background: linear-gradient(135deg, #f7fee7, #bef264);
+  color: #052e24;
+  box-shadow: 0 12px 28px rgba(5, 46, 36, .24);
+}
+.badmintonBoardHero .writeButton:hover {
+  background: linear-gradient(135deg, #ecfccb, #84cc16);
+}
+.badmintonBoardTable {
+  border-color: rgba(132, 204, 22, .32);
+  box-shadow: 0 18px 42px rgba(5, 46, 36, .10);
+}
+.badmintonBoardTable .tableTools strong,
+.badmintonBoardTable .tableTools .sortSelected,
+.badmintonBoardTable .noticeRow > span:first-child {
+  color: #65a30d;
+}
+.badmintonBoardTable .pagination .current {
+  background: #84cc16;
+  color: #052e24;
+}
+.badmintonBoardTable .postRow em {
+  background: rgba(132, 204, 22, .16);
+  color: #3f6212;
 }
