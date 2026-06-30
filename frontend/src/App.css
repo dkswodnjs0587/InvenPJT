@@ -2133,3 +2133,53 @@ html[data-theme="dark"] .realtimePanel li:nth-child(-n+3) b {
   filter: grayscale(1) saturate(0) brightness(1.8) contrast(1.12);
   opacity: 1;
 }
+
+/* ============================================================
+   수정사항 #5: 헤더와 목록 행의 좌우 패딩을 맞춰 열 정렬 일치
+   (postRow는 padding 0 12px인데 tableHead는 없어서 12px 어긋났음)
+   ============================================================ */
+.boardTable .tableHead { padding: 0 12px; }
+
+/* #6: 빈 행/검색결과 메시지를 제목 컬럼에 좌측 정렬로 표시 */
+.emptyRow .emptyMessage {
+  grid-column: 3;
+  text-align: left;
+  color: var(--muted);
+  font-size: 13px;
+}
+
+/* #3: 롤 라운지의 자유게시판 진입 버튼/카드 */
+.lolBoardButton { min-width: 156px; }
+.lolQuickGrid .lolBoardCard {
+  min-height: 130px;
+  padding: 20px;
+  display: block;
+  text-align: left;
+  border: 1px solid rgba(201, 162, 74, .5);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--surface) 84%, #f6d477);
+  box-shadow: 0 12px 28px rgba(7, 17, 31, .08);
+  cursor: pointer;
+  transition: transform .2s ease, box-shadow .2s ease, border-color .2s ease;
+}
+.lolQuickGrid .lolBoardCard:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 34px rgba(7, 17, 31, .16);
+  border-color: #d4a83f;
+}
+.lolQuickGrid .lolBoardCard b { display: block; color: var(--text); font-size: 17px; }
+.lolQuickGrid .lolBoardCard span { display: block; margin-top: 8px; color: var(--muted); font-size: 13px; line-height: 1.55; }
+html[data-theme="dark"] .lolQuickGrid .lolBoardCard {
+  background: linear-gradient(145deg, #1a2c46, #22304a);
+  border-color: rgba(248, 211, 111, .4);
+}
+
+/* #7: 마이페이지 닫기(X) 버튼이 스크롤해도 항상 보이도록 헤더 고정 */
+.myPageModal { padding-top: 0; }
+.myPageModal .modalHeader {
+  position: sticky;
+  top: 0;
+  z-index: 5;
+  padding-top: 24px;
+  background: var(--surface);
+}

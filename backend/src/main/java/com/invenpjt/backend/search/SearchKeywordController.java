@@ -1,5 +1,6 @@
 package com.invenpjt.backend.search;
 
+import jakarta.servlet.http.HttpSession;
 import jakarta.validation.Valid;
 import java.util.List;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -24,7 +25,7 @@ public class SearchKeywordController {
     }
 
     @PostMapping
-    public SearchKeywordResponse recordKeyword(@Valid @RequestBody SearchKeywordRequest request) {
-        return searchKeywordService.recordKeyword(request);
+    public SearchKeywordResponse recordKeyword(@Valid @RequestBody SearchKeywordRequest request, HttpSession session) {
+        return searchKeywordService.recordKeyword(request, session.getId());
     }
 }
