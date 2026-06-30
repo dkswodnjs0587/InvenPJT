@@ -6,6 +6,7 @@ import jakarta.persistence.FetchType;
 import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
+import jakarta.persistence.Index;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
@@ -15,7 +16,11 @@ import java.time.LocalDateTime;
 @Entity
 @Table(
         name = "comment_dislikes",
-        uniqueConstraints = @UniqueConstraint(name = "uk_comment_dislikes_comment_member", columnNames = {"comment_id", "member_id"})
+        uniqueConstraints = @UniqueConstraint(name = "uk_comment_dislikes_comment_member", columnNames = {"comment_id", "member_id"}),
+        indexes = {
+                @Index(name = "idx_comment_dislikes_comment", columnList = "comment_id"),
+                @Index(name = "idx_comment_dislikes_member", columnList = "member_id")
+        }
 )
 public class CommentDislike {
 

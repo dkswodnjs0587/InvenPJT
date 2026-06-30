@@ -12,6 +12,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -23,6 +24,19 @@ public class PostController {
 
     public PostController(PostService postService) {
         this.postService = postService;
+    }
+
+    @GetMapping("/boards/{boardSlug}/posts/page")
+    public PostPageResponse getPostPageByBoard(
+            @PathVariable String boardSlug,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "15") int size,
+            @RequestParam(defaultValue = "latest") String sort,
+            @RequestParam(required = false, name = "q") String query,
+            @RequestParam(defaultValue = "all") String scope,
+            HttpSession session
+    ) {
+        return postService.getPostPageByBoard(boardSlug, currentMemberId(session), page, size, sort, query, scope);
     }
 
     @GetMapping("/boards/{boardSlug}/posts")

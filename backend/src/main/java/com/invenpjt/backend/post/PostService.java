@@ -62,6 +62,48 @@ public class PostService {
     }
 
     @Transactional(readOnly = true)
+    public PostPageResponse getPostPageByBoard(
+            String boardSlug,
+            Long currentMemberId,
+            int page,
+            int size,
+            String sort,
+            String query,
+            String scope
+    ) {
+        Board board = getBoardBySlug(boardSlug);
+        int safePage = Math.max(0, page);
+        int safeSize = Math.min(Math.max(1, size), 50);
+        String safeSort = switch (sort == null ? "latest" : sort) {
+            case "likes", "views" -> sort;
+            default -> "latest";
+        };
+        String safeScope = switch (scope == null ? "all" : scope) {
+            case "title", "content", "author" -> scope;
+            default -> "all";
+        };
+        String keyword = query == null || query.trim().isBlank()
+                ? null
+                : "%" + query.trim().toLowerCase() + "%";
+
+        long totalItems = postRepository.countSummariesByBoard(board, keyword, safeScope);
+        int totalPages = Math.max(1, (int) Math.ceil((double) totalItems / safeSize));
+        int boundedPage = Math.min(safePage, totalPages - 1);
+        List<PostResponse> items = postRepository.findPagedSummariesByBoard(
+                        board,
+                        currentMemberId,
+                        keyword,
+                        safeScope,
+                        safeSort,
+                        PageRequest.of(boundedPage, safeSize)
+                ).stream()
+                .map(PostSummaryRow::toResponse)
+                .toList();
+
+        return new PostPageResponse(items, totalItems, totalPages, boundedPage, safeSize);
+    }
+
+    @Transactional(readOnly = true)
     public List<PostResponse> getLatestPosts(Long currentMemberId) {
         return postRepository.findLatestSummaries(currentMemberId, PageRequest.of(0, 10)).stream()
                 .map(PostSummaryRow::toResponse)

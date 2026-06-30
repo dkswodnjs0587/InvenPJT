@@ -32,6 +32,14 @@ type BoardPost = {
   updatedAt: string | null;
 };
 
+type BoardPostPage = {
+  items: BoardPost[];
+  totalItems: number;
+  totalPages: number;
+  page: number;
+  size: number;
+};
+
 type BoardComment = {
   id: number;
   postId: number;
@@ -163,6 +171,7 @@ function readBoardRoute(): BoardRoute {
 
 function FreeBoard({ onHome, onLolHome, onBadmintonHome, theme, onToggleTheme, member, onLogin, onSignup, onLogout, onMyPage = onHome, onNotify }: { onHome: () => void; onLolHome?: () => void; onBadmintonHome?: () => void; theme: Theme; onToggleTheme: () => void; member: Member | null; onLogin: () => void; onSignup: () => void; onLogout: () => void; onMyPage?: () => void; onNotify: (message: string) => void }) {
   const [posts, setPosts] = useState<BoardPost[]>([]);
+  const [totalPosts, setTotalPosts] = useState(0);
   const [selectedPost, setSelectedPost] = useState<BoardPost | null>(null);
   const [comments, setComments] = useState<BoardComment[]>([]);
   const [boardRoute, setBoardRoute] = useState<BoardRoute>(readBoardRoute);
@@ -192,14 +201,16 @@ function FreeBoard({ onHome, onLolHome, onBadmintonHome, theme, onToggleTheme, m
   const [searchQuery, setSearchQuery] = useState(() => new URLSearchParams(window.location.search).get("q") ?? "");
   const [searchScope, setSearchScope] = useState(() => new URLSearchParams(window.location.search).get("scope") ?? "all");
   const loungeParam = new URLSearchParams(window.location.search).get("lounge");
-  const isLolLoungeBoard = loungeParam === "lol";
+  const isLolLoungeBoard = loungeParam === "lol" || !loungeParam;
   const isBadmintonLoungeBoard = loungeParam === "badminton";
-  const boardHeroTitle = isLolLoungeBoard ? "LOL 자유게시판" : isBadmintonLoungeBoard ? "BADMINTON 자유게시판" : "자유 게시판";
-  const boardHeroEyebrow = isLolLoungeBoard ? "LOL LOUNGE" : isBadmintonLoungeBoard ? "BADMINTON LOUNGE" : "FREE BOARD";
-  const boardHeroDescription = isLolLoungeBoard ? "롤 라운지 자유게시판에서 자유롭게 이야기를 나누는 공간" : isBadmintonLoungeBoard ? "라켓, 셔틀콕, 동호회와 경기 이야기를 함께 나누는 공간" : "게임, 일상, 질문, 정보까지 자유롭게 이야기를 나누는 공간";
+  const currentBoardSlug = isBadmintonLoungeBoard ? "badminton-free" : "free";
+  const boardHeroTitle = isBadmintonLoungeBoard ? "배드민턴 자유게시판" : "LOL 자유게시판";
+  const boardHeroEyebrow = isBadmintonLoungeBoard ? "BADMINTON LOUNGE" : "LOL LOUNGE";
+  const boardHeroDescription = isBadmintonLoungeBoard
+    ? "라켓, 셔틀콕, 동호회와 경기 이야기를 함께 나누는 배드민턴 전용 공간"
+    : "LOL 라운지 자유게시판에서 소환사들의 이야기를 자유롭게 나누는 공간";
   const boardHomeHandler = isLolLoungeBoard ? onLolHome ?? onHome : isBadmintonLoungeBoard ? onBadmintonHome ?? onHome : onHome;
   const boardHeaderVariant = isLolLoungeBoard ? "lol" : isBadmintonLoungeBoard ? "badminton" : "main";
-
   const sortedComments = useMemo(() => {
     const next = [...comments];
     next.sort((a, b) => {
@@ -209,35 +220,10 @@ function FreeBoard({ onHome, onLolHome, onBadmintonHome, theme, onToggleTheme, m
     return next;
   }, [comments, commentSort]);
 
-  const sortedPosts = useMemo(() => {
-    const nextPosts = [...posts];
-    if (sortMode === "likes") {
-      nextPosts.sort((a, b) => (b.likeCount ?? 0) - (a.likeCount ?? 0) || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    } else if (sortMode === "views") {
-      nextPosts.sort((a, b) => b.viewCount - a.viewCount || new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    } else {
-      nextPosts.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-    }
-    return nextPosts;
-  }, [posts, sortMode]);
-
-  const filteredPosts = useMemo(() => {
-    const query = searchQuery.trim().toLowerCase();
-    if (!query) return sortedPosts;
-    return sortedPosts.filter((post) => {
-      const inTitle = post.title.toLowerCase().includes(query);
-      const inContent = post.content.toLowerCase().includes(query);
-      const inAuthor = post.authorName.toLowerCase().includes(query);
-      if (searchScope === "title") return inTitle;
-      if (searchScope === "author") return inAuthor;
-      if (searchScope === "content") return inContent;
-      return inTitle || inContent || inAuthor;
-    });
-  }, [sortedPosts, searchQuery, searchScope]);
-
-  const totalPages = Math.max(1, Math.ceil(filteredPosts.length / pageSize));
+  const filteredPosts = posts;
+  const totalPages = Math.max(1, Math.ceil(totalPosts / pageSize));
   const safeCurrentPage = Math.min(currentPage, totalPages);
-  const visiblePosts = filteredPosts.slice((safeCurrentPage - 1) * pageSize, safeCurrentPage * pageSize);
+  const visiblePosts = filteredPosts;
 
   const clearSearch = () => {
     setSearchQuery("");
@@ -277,18 +263,32 @@ function FreeBoard({ onHome, onLolHome, onBadmintonHome, theme, onToggleTheme, m
     setIsLoading(true);
     setError("");
 
-    fetch("/api/boards/free/posts", { credentials: "include" })
+    const params = new URLSearchParams();
+    params.set("page", String(Math.max(0, currentPage - 1)));
+    params.set("size", String(pageSize));
+    params.set("sort", sortMode);
+
+    const trimmedQuery = searchQuery.trim();
+    if (trimmedQuery) params.set("q", trimmedQuery);
+    if (searchScope !== "all") params.set("scope", searchScope);
+
+    fetch(`/api/boards/${currentBoardSlug}/posts/page?` + params.toString(), { credentials: "include" })
       .then(async (response) => {
         if (!response.ok) throw new Error("게시글을 불러오지 못했습니다.");
-        return await response.json() as BoardPost[];
+        return await response.json() as BoardPostPage;
       })
-      .then(setPosts)
+      .then((pageData) => {
+        setPosts(pageData.items);
+        setTotalPosts(pageData.totalItems);
+
+        const nextPage = pageData.page + 1;
+        if (nextPage !== currentPage) setCurrentPage(nextPage);
+      })
       .catch((caughtError) => {
         setError(caughtError instanceof Error ? caughtError.message : "잠시 후 다시 시도해 주세요.");
       })
       .finally(() => setIsLoading(false));
   };
-
   const loadComments = (postId: number) => {
     setIsCommentLoading(true);
     setCommentError("");
@@ -389,7 +389,7 @@ function FreeBoard({ onHome, onLolHome, onBadmintonHome, theme, onToggleTheme, m
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ boardSlug: "free", title, content }),
+        body: JSON.stringify({ boardSlug: currentBoardSlug, title, content }),
       });
 
       if (!response.ok) throw new Error(await readError(response));
@@ -591,7 +591,7 @@ function FreeBoard({ onHome, onLolHome, onBadmintonHome, theme, onToggleTheme, m
 
   useEffect(() => {
     loadPosts();
-  }, []);
+  }, [currentPage, pageSize, sortMode, searchQuery, searchScope, currentBoardSlug]);
 
   useEffect(() => {
     const onPopState = () => {
@@ -658,8 +658,8 @@ function FreeBoard({ onHome, onLolHome, onBadmintonHome, theme, onToggleTheme, m
         onLogout={onLogout}
         onMyPage={onMyPage}
         onMainHome={onHome}
-        variant={isLolLoungeBoard ? "lol" : "main"}
-        showHomeButton={isLolLoungeBoard}
+        variant={boardHeaderVariant}
+        showHomeButton={isLolLoungeBoard || isBadmintonLoungeBoard}
       />
 
       <main className="main boardPage">
@@ -875,13 +875,13 @@ function FreeBoard({ onHome, onLolHome, onBadmintonHome, theme, onToggleTheme, m
                     <span className="searchResultIcon" aria-hidden="true">⌕</span>
                     <b>'{searchQuery}'</b>
                     <small>{searchScope === "title" ? "제목" : searchScope === "author" ? "글쓴이" : searchScope === "content" ? "글 내용" : "전체"} 검색 결과</small>
-                    <strong>{filteredPosts.length}</strong>건
+                    <strong>{totalPosts}</strong>건
                   </span>
                   <button type="button" className="searchClearButton" onClick={clearSearch}>✕ 검색 해제</button>
                 </div>
               )}
               <div className="tableTools boardTableTools">
-                <b>전체 글 <strong>{searchQuery ? filteredPosts.length : posts.length}</strong></b>
+                <b>전체 글 <strong>{totalPosts}</strong></b>
                 <div className="boardListControls">
                   <label>
                     보기
@@ -923,7 +923,7 @@ function FreeBoard({ onHome, onLolHome, onBadmintonHome, theme, onToggleTheme, m
                 </article>
               )}
 
-              {!isLoading && !error && filteredPosts.length === 0 && (
+              {!isLoading && !error && posts.length === 0 && (
                 <article className="postRow emptyRow">
                   <span>-</span>
                   <span>-</span>
@@ -1278,7 +1278,7 @@ function Header({ onHome, theme, onToggleTheme, member, onLogin, onSignup, onLog
   const isFifaHeader = variant === "fifa";
   const isBadmintonHeader = variant === "badminton";
   const isLoungeHeader = isLolHeader || isFifaHeader || isBadmintonHeader;
-  const loungeTitle = isFifaHeader ? "FCO LOUNGE" : isBadmintonHeader ? "BMTON LOUNGE" : "LOL LOUNGE";
+  const loungeTitle = isFifaHeader ? "FCO LOUNGE" : isBadmintonHeader ? "BADMINTON" : "LOL LOUNGE";
   const loungeSubtitle = isFifaHeader ? "FC ONLINE" : isBadmintonHeader ? "SHUTTLE & COURT" : "LEAGUE OF LEGENDS";
   const loungeMark = isFifaHeader ? "F" : isBadmintonHeader ? "B" : "L";
 
@@ -1334,7 +1334,7 @@ function Home({ onOpenLounge, onOpenLolLounge, theme, onToggleTheme, member, onL
                     <b>{category.title}</b>
                     <small>{category.id === 1 || category.id === 2 || category.id === 6 ? category.description : `${category.description} · 준비 중`}</small>
                   </span>
-                  <i>{category.id === 1 || category.id === 2 ? "↗" : "·"}</i>
+                  <i aria-hidden="true">↗</i>
                 </button>
               ))}
             </div>
@@ -1623,7 +1623,101 @@ function FifaLounge({ header }: { header: ReactNode }) {
   return <>{header}<main className="main lolLounge fifaLounge"><section className="lolHero fifaHero"><div><span className="eyebrow">FCO LOUNGE</span><h1>피파 라운지</h1><p>스쿼드, 전술, 선수 추천을 이야기하는 축구 게임 라운지입니다.</p></div></section><section className="lolQuickGrid fifaQuickGrid"><article><b>로그인</b><span>상단 버튼으로 계정에 로그인할 수 있습니다.</span></article><article><b>회원가입</b><span>처음 방문했다면 계정을 만들고 참여하세요.</span></article><article><b>마이페이지</b><span>로그인 후 내 정보와 활동을 확인할 수 있습니다.</span></article><article><b>다크모드</b><span>헤더의 테마 버튼으로 화면 분위기를 바꿀 수 있습니다.</span></article></section></main></>;
 }
 function BadmintonLounge({ header, onOpenFreeBoard }: { header: ReactNode; onOpenFreeBoard: () => void }) {
-  return <>{header}<main className="main lolLounge badmintonLounge"><section className="lolHero badmintonHero"><div><span className="eyebrow">BADMINTON LOUNGE</span><h1>배드민턴 라운지</h1><p>라켓, 셔틀콕, 코트 위의 순간을 가볍고 빠르게 나누는 공간입니다.</p></div></section><section className="lolQuickGrid badmintonQuickGrid"><button type="button" className="lolBoardCard badmintonBoardCard" onClick={onOpenFreeBoard}><b>자유게시판</b><span>배드민턴 이야기, 경기 후기, 궁금한 점을 자유롭게 나눠보세요.</span></button><article><b>장비 추천</b><span>라켓, 스트링, 신발, 셔틀콕 정보를 한눈에 공유해요.</span></article><article><b>모임 / 매칭</b><span>동호회 모집과 함께 칠 사람을 찾는 공간입니다.</span></article><article><b>기술 / 레슨</b><span>스매시, 드롭, 풋워크 등 실전 팁을 모아보세요.</span></article></section></main></>;
+  const featherCards = [
+    {
+      title: "자유게시판",
+      label: "OPEN COURT",
+      description: "경기 후기, 질문, 잡담까지 가장 빠르게 오가는 배드민턴 이야기판",
+      meta: "입장하기",
+      action: onOpenFreeBoard,
+      primary: true,
+    },
+    {
+      title: "장비 라커",
+      label: "GEAR CHECK",
+      description: "라켓, 스트링, 신발, 셔틀콕 세팅을 비교하고 추천하는 공간",
+      meta: "라켓 · 스트링 · 슈즈",
+    },
+    {
+      title: "스킬 코트",
+      label: "FOOTWORK",
+      description: "스매시, 드롭, 클리어, 풋워크처럼 실전에서 바로 쓰는 팁 모음",
+      meta: "기술 · 레슨 · 루틴",
+    },
+    {
+      title: "매칭존",
+      label: "MATCH POINT",
+      description: "동호회 모집, 파트너 찾기, 번개 게임 공지를 빠르게 공유해요",
+      meta: "모임 · 대전 · 지역",
+    },
+  ];
+
+  return <>
+    {header}
+    <main className="main badmintonLounge badmintonFlightLounge">
+      <section className="badmintonFlightHero" aria-labelledby="badminton-title">
+        <div className="badmintonHeroCopy">
+          <span className="eyebrow">BADMINTON LOUNGE</span>
+          <h1 id="badminton-title">셔틀콕처럼 빠르게, 코트처럼 선명하게.</h1>
+          <p>배드민턴의 속도감과 타격감을 라임 그린 테마로 살린 전용 라운지입니다. 날아가는 셔틀콕의 깃털을 카드처럼 펼쳐 원하는 공간으로 바로 진입하세요.</p>
+          <div className="badmintonHeroActions">
+            <button type="button" onClick={onOpenFreeBoard}>자유게시판 바로가기</button>
+            <span>스매시 · 드롭 · 랠리 · 매칭</span>
+          </div>
+        </div>
+
+        <div className="shuttleStage" aria-hidden="true">
+          <span className="speedLine speedLineOne" />
+          <span className="speedLine speedLineTwo" />
+          <span className="speedLine speedLineThree" />
+          <div className="shuttleCock">
+            <span className="shuttleNose" />
+            <span className="shuttleCore" />
+            <span className="shuttleFeather featherOne" />
+            <span className="shuttleFeather featherTwo" />
+            <span className="shuttleFeather featherThree" />
+            <span className="shuttleFeather featherFour" />
+          </div>
+          <div className="courtPulse"><b>320</b><small>km/h smash mood</small></div>
+        </div>
+      </section>
+
+      <section className="shuttleFeatherGrid" aria-label="배드민턴 라운지 메뉴">
+        {featherCards.map((card, index) => {
+          const content = <>
+            <small>{card.label}</small>
+            <b>{card.title}</b>
+            <span>{card.description}</span>
+            <em>{card.meta}</em>
+          </>;
+
+          return card.action ? (
+            <button key={card.title} type="button" className={`featherMenuCard ${card.primary ? "primary" : ""}`} style={{ "--card-index": index } as CSSProperties} onClick={card.action}>{content}</button>
+          ) : (
+            <article key={card.title} className={`featherMenuCard ${card.primary ? "primary" : ""}`} style={{ "--card-index": index } as CSSProperties}>{content}</article>
+          );
+        })}
+      </section>
+
+      <section className="badmintonRallyPanel">
+        <article>
+          <span>01</span>
+          <b>빠른 진입</b>
+          <p>자주 쓰는 자유게시판을 첫 번째 깃털 카드로 배치했습니다.</p>
+        </article>
+        <article>
+          <span>02</span>
+          <b>스포츠 감성</b>
+          <p>대각선 궤적, 속도선, 코트 라인을 사용해 역동감을 살렸습니다.</p>
+        </article>
+        <article>
+          <span>03</span>
+          <b>라임 테마</b>
+          <p>기존 라운지 컬러는 유지하면서 배드민턴만의 생동감을 더했습니다.</p>
+        </article>
+      </section>
+    </main>
+  </>;
 }
 function MyPageModal({ member, onClose }: { member: Member; onClose: () => void }) {
   const [activity, setActivity] = useState<MyPageActivity | null>(null);
@@ -1803,7 +1897,8 @@ function EnhancedApp() {
   };
 
   useEffect(() => {
-    const pageTitle = activeView === "lol" ? "LOL LOUNGE" : activeView === "fifa" ? "FCO LOUNGE" : activeView === "badminton" ? "BADMINTON LOUNGE" : activeView === "login" ? "로그인" : activeView === "signup" ? "회원가입" : "LOUNGE";
+    const loungeParam = new URLSearchParams(window.location.search).get("lounge");
+    const pageTitle = activeView === "lol" ? "LOL LOUNGE" : activeView === "fifa" ? "FCO LOUNGE" : activeView === "badminton" || loungeParam === "badminton" ? "BADMINTON LOUNGE" : activeView === "login" ? "로그인" : activeView === "signup" ? "회원가입" : "LOUNGE";
     document.title = pageTitle;
   }, [activeView]);
 
