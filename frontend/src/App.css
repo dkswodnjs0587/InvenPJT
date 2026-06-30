@@ -2029,3 +2029,42 @@ html[data-theme="dark"] .categoryGrid .categoryCard::after {
 
 /* MyPage: settings removed → profile spans full width */
 .myPageModal .myPageGridSingle { grid-template-columns: 1fr; }
+
+/* Make light/dark theme color changes feel immediate on the main lounge cards. */
+.menuBar,
+.footer,
+.boardPanel,
+.categoryCard,
+.categoryIcon,
+.notice,
+.tabs .selected {
+  transition-duration: .12s;
+}
+
+.categoryGrid .categoryCard {
+  transition:
+    transform .18s cubic-bezier(.2,.8,.2,1),
+    box-shadow .18s ease,
+    border-color .12s ease,
+    background .12s ease,
+    color .12s ease;
+}
+
+.categoryGrid .categoryCard::before,
+.categoryGrid .categoryCard::after,
+html[data-theme="dark"] .categoryGrid .categoryCard::after {
+  transition-duration: .12s;
+}
+
+html[data-theme="dark"] .realtimePanel li {
+  border-top-color: #586985;
+}
+
+html[data-theme="dark"] .realtimePanel li:nth-child(-n+3) b {
+  color: #ef4444;
+}
+
+.notificationToggle > span[aria-hidden="true"] {
+  filter: grayscale(1) saturate(0) brightness(1.8) contrast(1.12);
+  opacity: 1;
+}
