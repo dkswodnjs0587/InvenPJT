@@ -367,6 +367,27 @@ html[data-theme="dark"] .lolQuickGrid article {
   border-color: rgba(248, 211, 111, .35);
 }
 
+.fifaHero {
+  border-color: rgba(74, 222, 128, .42);
+  background:
+    radial-gradient(circle at 82% 22%, rgba(45, 212, 191, .28), transparent 27%),
+    linear-gradient(125deg, #061a12, #0d3f2d 56%, #116149);
+}
+
+.fifaHero .eyebrow {
+  color: #86efac;
+}
+
+.fifaQuickGrid article {
+  border-color: rgba(74, 222, 128, .34);
+  background: color-mix(in srgb, var(--surface) 88%, #bbf7d0);
+}
+
+html[data-theme="dark"] .fifaQuickGrid article {
+  background: linear-gradient(145deg, #10251d, #173529);
+  border-color: rgba(134, 239, 172, .35);
+}
+
 @media (max-width: 920px) {
   .lolHero {
     align-items: flex-start;
@@ -430,6 +451,49 @@ html[data-theme="dark"] .lolQuickGrid article {
 .lolHeader .themeToggle,
 .lolHeader .homeIconBtn {
   border-color: rgba(248, 211, 111, .46);
+}
+
+.fifaHeader {
+  background: linear-gradient(90deg, #061a12, #0d3f2d 58%, #116149);
+  box-shadow: 0 12px 32px rgba(6, 26, 18, .28);
+}
+
+.fifaHeader .logo {
+  letter-spacing: 0;
+}
+
+.fifaHeader .logoBox {
+  background: linear-gradient(135deg, #22c55e, #86efac);
+  color: #052e1b;
+}
+
+.fifaHeader .logo small {
+  color: #86efac;
+}
+
+.fifaHeader .logoText {
+  gap: 6px;
+}
+
+.fifaHeader .searchBox {
+  border-color: rgba(134, 239, 172, .42);
+  background: rgba(255,255,255,.10);
+}
+
+.fifaHeader .searchBox:focus-within {
+  border-color: #86efac;
+}
+
+.fifaHeader .joinBtn {
+  background: #22c55e;
+  color: #052e1b;
+}
+
+.fifaHeader .loginBtn,
+.fifaHeader .myPageBtn,
+.fifaHeader .themeToggle,
+.fifaHeader .homeIconBtn {
+  border-color: rgba(134, 239, 172, .46);
 }
 
 .homeIconBtn {
@@ -1290,6 +1354,7 @@ html[data-theme="dark"] .scrollQuickButtons button {
   box-shadow: 0 4px 10px rgba(239,68,68,.45);
 }
 .lolHeader .notificationToggle { border-color: rgba(248, 211, 111, .46); }
+.fifaHeader .notificationToggle { border-color: rgba(134, 239, 172, .46); }
 .notificationPanel {
   position: absolute;
   top: 50px;
